@@ -1,0 +1,12 @@
+# Guild-specific Config file
+
+guild:
+    id: 839457899360157706
+    invite: https://discord.gg/H25skd7ZCj
+    name: yes
+
+bot:
+    prefix:
+
+ext:
+  - 
