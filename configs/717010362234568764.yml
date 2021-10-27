@@ -1,0 +1,17 @@
+# Guild-specific Config file
+
+guild:
+    id: 717010362234568764
+    invite: https://discord.gg/A2bGdepRZQ
+    name: KEN's Braincells
+
+bot:
+    prefix:
+
+ext:
+    adv_replies:
+    danked_memer:
+    messagehook:
+    reactomatic:
+    welcomer:
+        welcome_channel: 747499579527659540
