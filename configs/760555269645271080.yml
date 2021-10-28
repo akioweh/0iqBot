@@ -1,0 +1,12 @@
+# Guild-specific Config file
+
+guild:
+    id: 760555269645271080
+    invite:
+    name: Commuminecraftism
+
+bot:
+    prefix:
+
+ext:
+  - 

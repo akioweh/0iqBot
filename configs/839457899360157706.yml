@@ -1,0 +1,17 @@
+# Guild-specific Config file
+
+guild:
+    id: 839457899360157706
+    invite:
+    name:
+
+bot:
+    prefix:
+
+ext:
+    adv_replies:
+    danked_memer:
+    messagehook:
+    reactomatic:
+    welcomer:
+        welcome_channel: 839457899360157709
