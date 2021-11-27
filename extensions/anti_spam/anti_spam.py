@@ -119,11 +119,9 @@ class AntiSpam(Cog):
         score = rep_mlt * raw_score
         log += f'`Tot_Raw  :` `{raw_score}` \n' \
                f'`Final    :` `{round(rep_mlt, 3)}` * `{round(raw_score, 3)}` = **`{round(score, 3)}`** \n\n'
-        # print(f'         {round(rep_mlt, 3)} * {round(raw_score, 3)} = {round(score, 3)}')
 
         tracker._score += score
         log += f'`Rep_Scr  :` `{tracker._score}` \n'
-        # print(f'current score: {tracker._score}')
 
         print(log)
 
@@ -132,7 +130,7 @@ class AntiSpam(Cog):
 
     # noinspection PyProtectedMember
     async def temp_log(self, msg: Message, log: str):
-        chl = self.bot.get_channel(914032751433371709)
+        chl = self.bot.get_channel(775678736439181352)
         tracker = self.reputations[msg.author]
 
         embed_data = {
