@@ -1,11 +1,11 @@
 import re
-from typing import Union, List, Optional, Tuple, TYPE_CHECKING
 from asyncio import TimeoutError
+from typing import List, Optional, TYPE_CHECKING, Tuple, Union
 
 from discord import Message
 
+from botcord.ext.commands import Cog
 from botcord.functions import log
-from botcord.exts.commands import Cog
 
 if TYPE_CHECKING:
     from botcord import BotClient
@@ -18,7 +18,7 @@ def is_bj_message(message: Message) -> bool:
         return False
     try:
         embed = message.embeds[0].to_dict()
-        if re.findall('(?<=\[`. )(\d|10|J|Q|K|A)(?=`])', embed['fields'][0]['value']):
+        if re.findall(r'(?<=\[`. )(\d|10|J|Q|K|A)(?=`])', embed['fields'][0]['value']):
             return True
     except (KeyError, ValueError, IndexError):
         pass
@@ -26,7 +26,7 @@ def is_bj_message(message: Message) -> bool:
 
 
 def parse_cards(string: str) -> List[Optional[Union[str, int]]]:
-    results: List[Union[str, int]] = re.findall('(?<=\[`. )(\d|10|J|Q|K|A)(?=`])', string)
+    results: List[Union[str, int]] = re.findall(r'(?<=\[`. )(\d|10|J|Q|K|A)(?=`])', string)
     if not results:
         log(f'Error in bj card parsing: No card found: \n{string}', tag='Error')
         return []

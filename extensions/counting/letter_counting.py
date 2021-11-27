@@ -1,21 +1,23 @@
+import re
 from asyncio import TimeoutError
 from datetime import datetime
-from typing import Optional, List, TYPE_CHECKING
-import re
+from typing import List, Optional, TYPE_CHECKING
 
-from discord import Message, TextChannel, Reaction, User
-from discord.ext.commands import Context, command, check_any
+from discord import Message, Reaction, TextChannel, User
+from discord.ext.commands import Context, check_any, command
 
-from botcord.exts.commands import Cog
-from botcord.functions import batch
 from botcord.checks import guild_owner_or_perms, has_global_perms
+from botcord.ext.commands import Cog
+from botcord.functions import batch
 
 if TYPE_CHECKING:
     from botcord import BotClient
 
 A_UPPERCASE = ord('A')
 ALPHABET_SIZE = 26
-# noinspection SpellCheckingInspection R = r'^\s+|\s+$|(\|\|.*?\|\|)|(\s*((<:\w+:\d{18}>)|(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff]))\s*)+$'
+# noinspection SpellCheckingInspection R = r'^\s+|\s+$|(\|\|.*?\|\|)|(\s*((<:\w+:\d{18}>)|(\u00a9|\u00ae|[
+# noinspection SpellCheckingInspection \u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[
+# noinspection SpellCheckingInspection \ud000-\udfff]))\s*)+$'
 
 
 class LetterCounting(Cog):

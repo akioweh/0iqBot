@@ -6,9 +6,9 @@ from botcord import BotClient
 
 
 def init():
-    CLIENT = BotClient(status=discord.Status("online"),
+    client = BotClient(status=discord.Status("online"),
                        activity=discord.Activity(name="YOU | -IQ help", type=3))
-    CLIENT.run(getenv("TOKEN"))
+    client.run(getenv("TOKEN"))
 
 
 init()

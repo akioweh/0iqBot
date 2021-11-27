@@ -1,19 +1,15 @@
 import importlib
 import os
 import sys
-from typing import Any, Hashable, Dict, List
+from typing import Any, Dict, Hashable, List
 
 import discord
 from aiohttp import ClientSession
 from discord.ext import commands
-from discord.ext.commands.errors import (CommandNotFound,
-                                         DisabledCommand,
-                                         CheckFailure,
-                                         CommandOnCooldown,
-                                         UserInputError,
-                                         NoPrivateMessage)
+from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandOnCooldown, DisabledCommand,
+                                         NoPrivateMessage, UserInputError)
 
-from .configs import load_configs, save_guild_config, save_config, new_guild_config
+from .configs import load_configs, new_guild_config, save_config, save_guild_config
 from .functions import *
 from .utils.extensions import get_all_extensions_from
 
@@ -159,14 +155,14 @@ class BotClient(commands.Bot):
 
     async def on_message(self, message):
         self.latest_message = message
+        self.dispatch('message_all', message)  # Custom event to trigger both on new messages and edits
         await super().on_message(message)
-        self.dispatch('message_all', message)
 
     async def on_message_delete(self, message):
         pass
 
     async def on_message_edit(self, _, after):
-        self.dispatch('message_all', after)
+        self.dispatch('message_all', after)  # Custom event to trigger both on new messages and edits
 
     async def on_reaction_add(self, reaction, user):
         pass

@@ -1,5 +1,5 @@
-from urllib.parse import quote_plus as parse_url
 from typing import TYPE_CHECKING
+from urllib.parse import quote_plus as parse_url
 
 from discord.ext.commands import Cog, command
 
@@ -15,6 +15,7 @@ class SearchLinks(Cog):
     async def google(self, ctx, *, query):
         if not query:
             return
+        # noinspection HttpUrlsUsage
         await ctx.send(f'http://www.usethefuckinggoogle.com/?q={parse_url(query)}')
 
     @command(aliases=['minecraftwiki'])

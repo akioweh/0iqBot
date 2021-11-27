@@ -1,6 +1,6 @@
 from typing import List, Optional, TYPE_CHECKING
 
-from discord import Webhook, User, HTTPException, Forbidden, NotFound, AllowedMentions
+from discord import AllowedMentions, Forbidden, HTTPException, NotFound, User, Webhook
 from discord.ext.commands import Cog, Context, command
 
 if TYPE_CHECKING:
@@ -68,7 +68,8 @@ class MessageHook(Cog):
 
         except HTTPException as error:
             if error.code == 30007:
-                await ctx.reply('All existing webhooks are unusable (please delete). Failed to create new one: Maximum number of webhooks in this channel reached (10).')
+                await ctx.reply('All existing webhooks are unusable (please delete). Failed to create new one: '
+                                'Maximum number of webhooks in this channel reached (10).')
             else:
                 await ctx.reply('Failed to send message.', delete_after=10)
                 print(error)

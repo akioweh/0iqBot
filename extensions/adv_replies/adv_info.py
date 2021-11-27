@@ -1,9 +1,9 @@
 from typing import Optional, Union
 
-from discord import PartialEmoji, User, Role, TextChannel
+from discord import PartialEmoji, Role, TextChannel, User
 from discord.ext.commands import Cog, Context, group
+from discord.ext.commands.converter import Greedy, UserConverter
 from discord.ext.commands.errors import UserNotFound
-from discord.ext.commands.converter import UserConverter, Greedy
 
 from botcord.utils import find
 
@@ -22,8 +22,9 @@ class AdvInfo(Cog):
          - Pings/Mentions
          - Emojis
 
-        The main command tries to determing the type and convert appropriately. If that doesn't work, there is a subcommand for each type.
-        For example, `escape @a-ping` will output a plain text/string that will generate the ping when pasted.
+        The main command tries to determine the type and convert appropriately. If that doesn't work, there is a
+        subcommand for each type. For example, `escape @a-ping` will output a plain text/string that will generate
+        the ping when pasted.
         """
         if args:
             msg = '[ '
