@@ -87,18 +87,18 @@ class BotClient(commands.Bot):
         return True
 
     @staticmethod
-    def _blocked_check_helper(ctx: commands.Context, blocked_entires: list, scope='a'):
+    def _blocked_check_helper(ctx: commands.Context, blocked_entries: list, scope='a'):
         if scope not in ('a', 'g', 'c'):
             raise ValueError(f'Scope parameter must be either a, g, or c, not {scope}')
-        if ctx.command.name in blocked_entires:
+        if ctx.command.name in blocked_entries:
             return False
-        if any(i.name in blocked_entires for i in ctx.invoked_parents):
+        if any(i.name in blocked_entries for i in ctx.invoked_parents):
             return False
-        if 'ALL' in blocked_entires:
+        if 'ALL' in blocked_entries:
             return False
-        if scope in ('a', 'g') and ctx.cog.qualified_name in blocked_entires:
+        if scope in ('a', 'g') and ctx.cog.qualified_name in blocked_entries:
             return False
-        if scope == 'a' and ctx.guild in blocked_entires:
+        if scope == 'a' and ctx.guild in blocked_entries:
             return False
         return True
 
@@ -268,7 +268,7 @@ class BotClient(commands.Bot):
     async def on_group_join(self, channel, user):
         pass
 
-    async def on_group_remove(self, channe, user):
+    async def on_group_remove(self, channel, user):
         pass
 
     async def on_relationship_add(self, relationship):
@@ -298,8 +298,8 @@ class BotClient(commands.Bot):
 
         #  Additional logging for HTTP (networking) errors
         if isinstance(exception, discord.HTTPException):
-            log(f'An API Exception has occured ({exception.code}): {exception.text}', tag='Error')
-            context.reply(f'An API error occured while executing the command. (API Error code: {exception.code})')
+            log(f'An API Exception has occurred ({exception.code}): {exception.text}', tag='Error')
+            context.reply(f'An API error occurred while executing the command. (API Error code: {exception.code})')
 
     async def on_command_completion(self, context):
         pass

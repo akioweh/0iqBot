@@ -11,12 +11,12 @@ if TYPE_CHECKING:
 
 
 # noinspection PyShadowingBuiltins
-def print(*_):
+def print_(*_):
     pass
 
 
 X = {
-    'Rep_Lin_Dec': 0.006,
+    'Rep_Lin_Dec': 0.01,
 
     'Rep_Grw_Mlt': 2.0,
     'Rep_Grw_Scl': 4.,
@@ -50,7 +50,7 @@ class Reputation:
             self._score -= offset
         elif self._score < 0:
             self._score += offset
-        print(f'offset of {offset} from {time.time() - self._last_time}')
+        # print(f'offset of {offset} from {time.time() - self._last_time}')
         self._last_time = time.time()
         return self._score
 
@@ -100,20 +100,29 @@ class AntiSpam(Cog):
         non_asciis = len(msg.content) - len(msg_ascii)
         mentions = len(re.findall(r'<(:\w+:|@|#|@&)\d{18}>', msg.content))
 
-        log += f'`Non-ASCII:` `{non_asciis}` \n'
-        log += f'`Mentions :` `{mentions}` \n'
+        log += f'`Non-ASCII:` `{"{:<4}".format(non_asciis)}` \n'
+        log += f'`Mentions :` `{"{:<4}".format(mentions)}` \n'
 
-        msg_len = - sigmoidy(len(msg.content), X['Msg_Len_Scl'], X['Msg_Len_Mlt'])   # Message Text Length
-        msg_men = - exponenty(len(msg.mentions) + len(msg.role_mentions), X['Msg_Men_Scl'], X['Msg_Men_Mlt'])  # Message User/Role Mentions
-        msg_att = - sigmoidy(len(msg.attachments), X['Msg_Att_Scl'], X['Msg_Att_Mlt'])  # Message Attachments
-        msg_chr = - sigmoidy(non_asciis + mentions, X['Msg_Chr_Scl'], X['Msg_Chr_Mlt'])  # Special Characters
+        msg_len = len(msg.content)
+        msg_men = len(msg.mentions) + len(msg.role_mentions)
+        msg_att = len(msg.attachments)
+        msg_chr = non_asciis + mentions
 
-        log += f'`Msg_Len  :` `{msg_len}` \n' \
-               f'`Msg_Men  :` `{msg_men}` \n' \
-               f'`Msg_Att  :` `{msg_att}` \n' \
-               f'`Msg_Chr  :` `{msg_chr}` \n\n'
+        if msg.reference and msg.reference.cached_message and msg.reference.cached_message.author in msg.mentions:
+            log += f'ReplyPinged {len(msg.mentions)} - 1 \n'
+            msg_men -= 1
 
-        raw_score = sum((msg_len, msg_men, msg_att, msg_chr))
+        scr_len = sigmoidy(msg_len, X['Msg_Len_Scl'], X['Msg_Len_Mlt'])  # Message Text Length
+        scr_men = paraboly(msg_men, X['Msg_Men_Scl'], X['Msg_Men_Mlt'])  # Message User/Role Mentions
+        scr_att = sigmoidy(msg_att, X['Msg_Att_Scl'], X['Msg_Att_Mlt'])  # Message Attachments
+        scr_chr = sigmoidy(msg_chr, X['Msg_Chr_Scl'], X['Msg_Chr_Mlt'])  # Special Characters
+
+        log += f'`Msg_Len  :` `{"{:<4}".format(msg_len)}` `=>` `{"{:.4f}".format(scr_len)}` \n' \
+               f'`Msg_Men  :` `{"{:<4}".format(msg_men)}` `=>` `{"{:.4f}".format(scr_men)}` \n' \
+               f'`Msg_Att  :` `{"{:<4}".format(msg_att)}` `=>` `{"{:.4f}".format(scr_att)}` \n' \
+               f'`Msg_Chr  :` `{"{:<4}".format(msg_chr)}` `=>` `{"{:.4f}".format(scr_chr)}` \n\n'
+
+        raw_score = - sum((scr_len, scr_men, scr_att, scr_chr))
 
         rep_mlt = sigmoidy(abs(tracker.score), X['Rep_Grw_Scl'], X['Rep_Grw_Mlt']) + 1
         score = rep_mlt * raw_score
@@ -125,12 +134,15 @@ class AntiSpam(Cog):
 
         print(log)
 
-        if tracker._score <= -5:
-            await self.temp_log(msg, log)
+        # if tracker._score <= -5:
+        await self.temp_log(msg, log)
 
     # noinspection PyProtectedMember
     async def temp_log(self, msg: Message, log: str):
-        chl = self.bot.get_channel(775678736439181352)
+        chl = self.bot.get_channel(914032751433371709)
+        if not chl:
+            print('didnt find log channel for antispam')
+            return
         tracker = self.reputations[msg.author]
 
         embed_data = {
@@ -145,10 +157,10 @@ class AntiSpam(Cog):
 
 
 def sigmoidy(x, in_max=1., out_max=1.):
-    return (1 / (1 + 15.7**(-3 * (x / in_max) + 1.5))) * out_max if x != 0 else 0
+    return (1 / (1 + 15.7 ** (-3 * (x / in_max) + 1.5))) * out_max if x != 0 else 0
 
 
-def exponenty(x, in_max=1., out_max=1.):
+def paraboly(x, in_max=1., out_max=1.):
     return min((1.1 * (x / in_max) + 0.3) ** 2.1 - 0.04, (x / in_max) + 1) * out_max if x != 0 else 0
 
 
