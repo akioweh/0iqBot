@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 # noinspection PyShadowingBuiltins
-def print_(*_):
+def print(*_):
     pass
 
 
