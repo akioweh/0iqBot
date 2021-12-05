@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 import os
 import sys
@@ -13,6 +14,10 @@ from .configs import load_configs, new_guild_config, save_config, save_guild_con
 from .functions import *
 from .utils.extensions import get_all_extensions_from
 
+# Fix to stop aiohttp spamming errors in stderr when closing because that is uglier
+if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith('win'):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 
 class BotClient(commands.Bot):
     initialized: bool
@@ -25,7 +30,8 @@ class BotClient(commands.Bot):
     def __init__(self, **options):
         self.initialized = False
         global_configs, guild_configs = load_configs()
-        prefix_check = BotClient.mentioned_or_in_prefix if global_configs['bot']['reply_to_mentions'] else BotClient.in_prefix
+        prefix_check = BotClient.mentioned_or_in_prefix if global_configs['bot'][
+            'reply_to_mentions'] else BotClient.in_prefix
         self.__status = options.pop('status', None)
         self.__activity = options.pop('activity', None)
         super().__init__(**options,
@@ -289,7 +295,8 @@ class BotClient(commands.Bot):
         elif isinstance(exception, NoPrivateMessage):
             await context.reply('This does not work in Direct Messages!', delete_after=10)
         elif isinstance(exception, CommandOnCooldown):
-            await context.reply(f'Command is on cooldown. Please try again in {exception.retry_after} seconds.', delete_after=10)
+            await context.reply(f'Command is on cooldown. Please try again in {exception.retry_after} seconds.',
+                                delete_after=10)
         elif isinstance(exception, UserInputError):
             await context.reply('Invalid inputs.', delete_after=10)
         else:
@@ -350,8 +357,6 @@ class BotClient(commands.Bot):
         save_config(self.configs)
         self.save_guild_configs()
         await self.aiohttp_session.close()
-        # Ugly temp hack-fix to stop aiohttp spamming errors in stderr when closing because that is uglier
-        sys.stderr = None
         await super().close()
 
 # End
