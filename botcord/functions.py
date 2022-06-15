@@ -1,12 +1,12 @@
-from datetime import datetime
-from sys import __stdout__
-from typing import Optional, Iterable, Union
-
 import re
+from datetime import datetime
+from typing import Iterable, Optional, Union
+
 from discord import Message
+from sys import __stdout__
 
 
-def removeprefix(string: str, prefix) -> str:
+def removeprefix(string: str, prefix: Union[str, Iterable]) -> str:
     """Similar to ``str.removeprefix()`` in python 3.9,
     except it works for lower versions and can take a list of prefixes"""
     if isinstance(prefix, str):
@@ -17,7 +17,7 @@ def removeprefix(string: str, prefix) -> str:
         return string
 
 
-def removesuffix(string: str, suffix) -> str:
+def removesuffix(string: str, suffix: Union[str, Iterable]) -> str:
     """Similar to ``str.removesuffix()`` in python 3.9,
     except it works for lower versions and can take a list of suffixes"""
     if isinstance(suffix, str):
@@ -28,12 +28,12 @@ def removesuffix(string: str, suffix) -> str:
         return string
 
 
-def time_str():
+def time_str() -> str:
     """returns a formatted string of current time"""
     return datetime.now().strftime("%H:%M:%S")
 
 
-def log(message: str, tag="Main", end="\n", time=True):
+def log(message: str, tag: str = "Main", end: str = "\n", time: bool = True):
     """Logs messages to stdout.
     ``[timestamp] [tag] message (ending)``
 
@@ -41,7 +41,10 @@ def log(message: str, tag="Main", end="\n", time=True):
     :param str tag: tag, defaults to "Main"
     :param str end: string to append to the end of the output, defaults to newline (\n)
     :param bool time: whether to output a timestamp"""
-    __stdout__.write(f"{('[' + time_str() + '] ') if time else ''}{('[' + tag + ']: ') if tag else ''}{message}{end}")
+    __stdout__.write((f'[{time_str()}] ' if time else '') +
+                     (f'[{tag}]: ' if tag else '') +
+                     f'{message}{end}')
+    __stdout__.flush()
 
 
 def to_int(string: str) -> Optional[int]:
