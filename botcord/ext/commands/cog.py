@@ -2,7 +2,7 @@ import os
 
 from discord.ext.commands import Cog as _Cog
 
-from botcord.configs import YAML, recursive_update
+from botcord.configs import YAML as _YAML, recursive_update as _recursive_update
 
 
 # noinspection PyAttributeOutsideInit
@@ -15,21 +15,27 @@ class Cog(_Cog):
         self._configed = True
 
     def save_config(self):
+        """overwrites config on disk with config in memory"""
         with open(self._config_dir, mode='w', encoding='UTF-8') as file:
-            YAML.dump(self.config, file)
+            _YAML.dump(self.config, file)
 
     def load_config(self):
+        """overwrites config in memory with config on disk"""
         self._config = self._load_config()
 
     def refresh_config(self):
+        """recursively merges configs from disk and memory
+        (disk as base, memory as overwrite)
+        THEN saves merged to disk"""
         file_conf = self._load_config()
-        recursive_update(file_conf, self.config)
+        _recursive_update(file_conf, self.config)
         self.save_config()
 
     def _load_config(self):
+        """reads and returns config from disk"""
         with open(self._config_dir, mode='a+', encoding='UTF-8') as wfile:
             wfile.seek(0)
-            wloaded = YAML.load(wfile)
+            wloaded = _YAML.load(wfile)
             if not wloaded:
                 wloaded = {}
             return wloaded
