@@ -1,10 +1,10 @@
 import asyncio
 import importlib
 import os
-import sys
 from typing import Any, Dict, Hashable, List
 
 import discord
+import sys
 from aiohttp import ClientSession
 from discord.ext import commands
 from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandOnCooldown, DisabledCommand,
@@ -12,6 +12,7 @@ from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandO
 
 from .configs import load_configs, new_guild_config, save_config, save_guild_config
 from .functions import *
+from .utils.errors import protect
 from .utils.extensions import get_all_extensions_from
 
 # Fix to stop aiohttp spamming errors in stderr when closing because that is uglier
@@ -57,16 +58,16 @@ class BotClient(commands.Bot):
             self.load_extension(extension)
 
     async def _init(self) -> bool:
-        try:
+        with protect():
             if self.initialized:
                 return False
             await self.validate_guild_configs()
             self.save_guild_configs()
-        finally:
-            await self.change_presence(activity=self.__activity, status=self.__status)
-            self.initialized = True
-            log('Bot finished Initializing')
-            return True
+
+        await self.change_presence(activity=self.__activity, status=self.__status)
+        self.initialized = True
+        log('Bot finished Initializing')
+        return True
 
     @staticmethod
     async def blocked_check(ctx: commands.Context):
