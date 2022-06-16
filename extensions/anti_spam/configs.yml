@@ -1,0 +1,3 @@
+flag_threshold: -4
+mute_threshold: -6.5
+unmute_reserve: -0.3
