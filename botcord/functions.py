@@ -1,12 +1,12 @@
 import re
 from datetime import datetime
-from typing import Iterable, Optional, Union
+from typing import Any, Iterable, Optional
 
 from discord import Message
 from sys import __stdout__
 
 
-def removeprefix(string: str, prefix: Union[str, Iterable]) -> str:
+def removeprefix(string: str, prefix: str | Iterable[str]) -> str:
     """Similar to ``str.removeprefix()`` in python 3.9,
     except it works for lower versions and can take a list of prefixes"""
     if isinstance(prefix, str):
@@ -17,7 +17,7 @@ def removeprefix(string: str, prefix: Union[str, Iterable]) -> str:
         return string
 
 
-def removesuffix(string: str, suffix: Union[str, Iterable]) -> str:
+def removesuffix(string: str, suffix: str | Iterable[str]) -> str:
     """Similar to ``str.removesuffix()`` in python 3.9,
     except it works for lower versions and can take a list of suffixes"""
     if isinstance(suffix, str):
@@ -29,11 +29,11 @@ def removesuffix(string: str, suffix: Union[str, Iterable]) -> str:
 
 
 def time_str() -> str:
-    """returns a formatted string of current time"""
-    return datetime.now().strftime("%H:%M:%S")
+    """returns a formatted string of the current time"""
+    return datetime.now().strftime('%H:%M:%S')
 
 
-def log(message: str, tag: str = "Main", end: str = "\n", time: bool = True):
+def log(message: str, tag: str = 'Main', end: str = '\n', time: bool = True):
     """Logs messages to stdout.
     ``[timestamp] [tag] message (ending)``
 
@@ -47,50 +47,84 @@ def log(message: str, tag: str = "Main", end: str = "\n", time: bool = True):
     __stdout__.flush()
 
 
-def to_int(string: str) -> Optional[int]:
+def to_int(obj: Any, *args, **kwargs) -> Optional[int]:
+    """tries to cast an object to :class:`int` \n
+    returns None if conversion fails"""
     try:
-        return int(string)
+        return int(obj, *args, **kwargs)
     except ValueError:
         return None
 
 
-def to_flt(string: str) -> Optional[float]:
+def to_flt(obj: Any) -> Optional[float]:
+    """tries to cast an object to :class:`float` \n
+    returns None if conversion fails"""
     try:
-        return float(string)
+        return float(obj)
     except ValueError:
         return None
 
 
 def clean_return(string: str) -> str:
-    return str(string).replace("\r\n", "\n").replace("\r", "\n").replace(" \n", "\n").strip()
+    """"cleans" a string's line returns \n
+    ensures all linebreaks are ``\\n`` and strips away leading and trailing whitespaces"""
+    return str(string).replace('\r\n', '\n').replace('\r', '\n').replace(' \n', '\n').strip()
 
 
 async def load_list(filepath):
-    with open(filepath, mode="r", encoding="utf-8") as file:
+    """loads a list of strings from a text file, items delimited by newlines"""
+    with open(filepath, mode='r', encoding='utf-8') as file:
         return file.read().splitlines()
 
 
 async def save_list(filepath, array):
-    with open(filepath, mode="w", encoding="utf-8") as file:
+    """saves a list of items as strings to a text file, delimited by newlines"""
+    with open(filepath, mode='w', encoding='utf-8') as file:
         for item in array:
-            file.write(clean_return(item).replace("\n", " ") + "\n")
+            file.write(clean_return(item).replace("\n", "\\n") + "\n")
 
 
-def batch(msg: str, d="\n", length=2000):
-    splitted = [e + d for e in msg.split(d) if e]
-    result = ""
+def batch(msg: str, d: str = '\n', length: int = 2000, *, d2: str = ' '):
+    """
+    "batches" a long string semi-intelligently into chunks no more than 2000 characters long \n
+    useful to split a long essay into messages short enough to be sent over discord
+
+    instead of chopping up between random words and characters, it tries to only split at linebreaks,
+    or at least at word boundaries if a line is tooooo long \n
+    if a word is too long, well then it will have to split it in the middle
+
+    :param str msg: the entire long message
+    :param str d: preferred separating character
+    :param str d2: (keyword-only) secondary/backup separating character
+    :param int length: maximum length of chunks, 2000 for standard discord, 4000 for discord nitro
+    :return: a list of strings under the length limit
+    """
+    splitted = [e + d for e in msg.split(d)]
+    if splitted[-1] == d:
+        splitted.pop()
+    else:
+        splitted[-1] = removesuffix(splitted[-1], d)
+
+    cache = ''
     while splitted:
-        if len(result) + len(splitted[0]) <= length:
-            result += splitted.pop(0)
-        elif result:
-            yield result
-            result = ""
-        else:
-            yield splitted.pop(0)
-    yield result
+        if len(cache) + len(splitted[0]) <= length:
+            cache += splitted.pop(0)
+        elif cache:
+            yield cache
+            cache = ''
+        else:  # if a split chunk is still larger than length
+            long = splitted.pop(0)
+            if d2 != '':  # try to split more aggressively using backup separator
+                temp = list(batch(long, d2, length, d2=''))
+            else:  # nothing more to do, just cut off between any character
+                temp = list(long[i:i + length] for i in range(0, len(long), length))
+            splitted = temp + splitted
+
+    if cache:
+        yield cache
 
 
-def _contain_arg_helper(arg: Union[Message, str], check: Union[Iterable[str], str], match_case: bool = False):
+def _contain_arg_helper(arg: Message | str, check: Iterable[str] | str, match_case: bool = False):
     items = [check] if isinstance(check, str) else check
     if isinstance(arg, Message):
         string = arg.content
@@ -104,19 +138,56 @@ def _contain_arg_helper(arg: Union[Message, str], check: Union[Iterable[str], st
     return string, items
 
 
-def contain_any(arg: Union[Message, str], check: Union[Iterable[str], str], match_case: bool = False) -> bool:
-    string, items = _contain_arg_helper(arg, check, match_case)
+def contain_any(msg: Message | str, check: Iterable[str] | str, match_case: bool = False) -> bool:
+    """
+    Checks whether message contains [**any** of a list of strings / a string]
+
+    if ``msg`` is :class:`discord.Message`, the message content as string is used
+
+    :param Message | str msg: the main message to be checked for if it contains target substrings
+    :param Iterable[str] | str check: a string or list of strings to check for containment inside msg
+    :param bool match_case: whether to care about letter casing
+    :return: result of check as a boolean
+    :rtype: bool
+    """
+    string, items = _contain_arg_helper(msg, check, match_case)
     return any(str(i) in string for i in items)
 
 
-def contain_all(arg: Union[Message, str], check: Union[Iterable[str], str], match_case: bool = False) -> bool:
-    string, items = _contain_arg_helper(arg, check, match_case)
+def contain_all(msg: Message | str, check: Iterable[str] | str, match_case: bool = False) -> bool:
+    """
+    Checks whether message contains [**all** of a list of strings / a string]
+
+    if ``msg`` is :class:`discord.Message`, the message content as string is used
+
+    :param Message | str msg: the main message to be checked for if it contains target substrings
+    :param Iterable[str] | str check: a string or list of strings to check for containment inside msg
+    :param bool match_case: whether to care about letter casing
+    :return: result of check as a boolean
+    :rtype: bool
+    """
+    string, items = _contain_arg_helper(msg, check, match_case)
     return all(str(i) in string for i in items)
 
 
-def contain_word(arg: Union[Message, str], check: Union[Iterable[str], str], match_case: bool = False) -> bool:
-    string, items = _contain_arg_helper(arg, check, match_case)
+def contain_word(msg: Message | str, check: Iterable[str] | str, match_case: bool = False) -> bool:
+    """
+    Checks whether message contains [**any** of a list of words / a word]
+
+    if ``msg`` is :class:`discord.Message`, the message content as string is used
+
+    very similar to ``contain_any``, except it only matches a target when the ``check`` string
+    is surrounded by whitespace in ``msg``
+
+    :param Message | str msg: the main message to be checked for if it contains target substrings
+    :param Iterable[str] | str check: a word or list of words to check for containment inside msg
+    :param bool match_case: whether to care about letter casing
+    :return: result of check as a boolean
+    :rtype: bool
+    """
+    string, items = _contain_arg_helper(msg, check, match_case)
     return any(re.findall(rf'\b{i}\b', string, 0 if match_case else re.IGNORECASE) for i in items)
 
 
-# End
+__all__ = ['removesuffix', 'removeprefix', 'time_str', 'log', 'to_int', 'to_flt', 'clean_return', 'load_list',
+           'save_list', 'batch', 'contain_any', 'contain_all', 'contain_word']
