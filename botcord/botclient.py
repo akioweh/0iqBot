@@ -1,4 +1,3 @@
-from asyncio import WindowsSelectorEventLoopPolicy as Wsep, set_event_loop_policy as selp
 from contextlib import suppress
 from importlib import import_module
 from os import getcwd
@@ -18,7 +17,8 @@ from .utils.extensions import get_all_extensions_from
 
 # Fix to stop aiohttp spamming errors in stderr when closing because that is uglier
 if __version_info__[0] == 3 and __version_info__[1] >= 8 and __platform__.startswith('win'):
-    selp(Wsep())
+    from asyncio import WindowsSelectorEventLoopPolicy, set_event_loop_policy
+    set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 
 class BotClient(commands.Bot):
