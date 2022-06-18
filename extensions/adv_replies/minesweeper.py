@@ -29,9 +29,7 @@ class MineSweeper(Cog):
 
     @command(aliases=['ms'])
     async def minesweeper(self, ctx: Context, width: int, height: int, mines: int):
-        """
-        Generates minesweeper board using spoilers.
-        """
+        """Generates minesweeper board using spoilers."""
         grids = width * height
         if width <= 0 or height <= 0:
             await ctx.reply('stop tryna set invalid board sizes lol')
