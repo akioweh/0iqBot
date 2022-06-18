@@ -31,7 +31,6 @@ class MineSweeper(Cog):
     async def minesweeper(self, ctx: Context, width: int, height: int, mines: int):
         """
         Generates minesweeper board using spoilers.
-        arguments: minesweeper <width> <height> <bombs>
         """
         grids = width * height
         if width <= 0 or height <= 0:
