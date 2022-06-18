@@ -1,5 +1,5 @@
-import re
 from datetime import datetime
+from re import IGNORECASE, findall as _re_findall
 from typing import Any, Iterable, Optional
 
 from discord import Message
@@ -71,13 +71,13 @@ def clean_return(string: str) -> str:
     return str(string).replace('\r\n', '\n').replace('\r', '\n').replace(' \n', '\n').strip()
 
 
-async def load_list(filepath):
+def load_list(filepath):
     """loads a list of strings from a text file, items delimited by newlines"""
     with open(filepath, mode='r', encoding='utf-8') as file:
         return file.read().splitlines()
 
 
-async def save_list(filepath, array):
+def save_list(filepath, array):
     """saves a list of items as strings to a text file, delimited by newlines"""
     with open(filepath, mode='w', encoding='utf-8') as file:
         for item in array:
@@ -124,8 +124,8 @@ def batch(msg: str, d: str = '\n', length: int = 2000, *, d2: str = ' '):
         yield cache
 
 
-def _contain_arg_helper(arg: Message | str, check: Iterable[str] | str, match_case: bool = False):
-    items = [check] if isinstance(check, str) else check
+def _contain_arg_helper(arg: Message | str, check: Iterable[str] | str, match_case: bool = False) -> [str, Iterable[str]]:
+    items: Iterable[str] = [check] if isinstance(check, str) else check
     if isinstance(arg, Message):
         string = arg.content
     elif isinstance(arg, str):
@@ -186,7 +186,7 @@ def contain_word(msg: Message | str, check: Iterable[str] | str, match_case: boo
     :rtype: bool
     """
     string, items = _contain_arg_helper(msg, check, match_case)
-    return any(re.findall(rf'\b{i}\b', string, 0 if match_case else re.IGNORECASE) for i in items)
+    return any(_re_findall(rf'\b{i}\b', string, 0 if match_case else IGNORECASE) for i in items)
 
 
 __all__ = ['removesuffix', 'removeprefix', 'time_str', 'log', 'to_int', 'to_flt', 'clean_return', 'load_list',

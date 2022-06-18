@@ -29,3 +29,6 @@ class protect:
                 print(f'Exception ingored and resuming execution of the remaining program:', file=sys.stderr)
                 traceback.print_exc()
         return True
+
+
+__all__ = ['protect']

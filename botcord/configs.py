@@ -1,28 +1,41 @@
 import os
+from typing import Optional, TypeAlias
 
 import ruamel.yaml
 
 from .functions import log
 
-DEFAULT_GLOBAL_CONFIG_PATH = os.path.dirname(os.path.realpath(__file__)) + '/default_global_configs.yml'
-DEFAULT_GUILD_CONFIG_PATH = os.path.dirname(os.path.realpath(__file__)) + '/default_guild_configs.yml'
+DEFAULT_GLOBAL_CONFIG_PATH: str = os.path.dirname(os.path.realpath(__file__)) + '/default_global_configs.yml'
+DEFAULT_GUILD_CONFIG_PATH: str = os.path.dirname(os.path.realpath(__file__)) + '/default_guild_configs.yml'
 
 YAML = ruamel.yaml.YAML()
 YAML.indent(mapping=4, sequence=4, offset=2)
 
+ConfigDict: TypeAlias = dict[str, str | int | list | dict]
 
-def load_configs(*, global_path='global_configs.yml', guild_dir='configs/'):
+
+def recursive_update(base: dict, extra: dict) -> None:
+    """updates base IN PLACE"""
+    for k, v in extra.items():
+        if k in base and isinstance(base[k], dict) and isinstance(extra[k], dict):
+            recursive_update(base[k], extra[k])
+        else:
+            base[k] = extra[k]
+
+
+def load_configs(*, global_path: str = 'global_configs.yml', guild_dir: str = 'configs/') -> \
+        [ConfigDict, dict[int, ConfigDict]]:
     # Global Configuration File
     global_config_path = os.getcwd() + '/' + global_path
     try:
-        global_configs = default()
+        global_configs = default_global()
         with open(global_config_path, encoding='UTF-8') as wfile:
             wloaded = YAML.load(wfile)
             if wloaded:
                 recursive_update(global_configs, wloaded)
     except FileNotFoundError:
         log(f'Did not find Global Configuration File at {global_config_path}; using Defaults.', tag='Info')
-        global_configs = default()
+        global_configs = default_global()
 
     # Guild Configuration Files
     guild_configs = {}
@@ -48,7 +61,8 @@ def load_configs(*, global_path='global_configs.yml', guild_dir='configs/'):
     return global_configs, guild_configs
 
 
-def new_guild_config(guild_id, initial_config=None, guild_dir='configs/'):
+def new_guild_config(guild_id: int, initial_config: Optional[ConfigDict] = None, *, guild_dir: str = 'configs/') -> \
+        ConfigDict:
     guild_configs_dir = os.getcwd() + '/' + guild_dir
     config = default_guild()
     recursive_update(config, {'guild': {'id': guild_id}})
@@ -62,27 +76,19 @@ def new_guild_config(guild_id, initial_config=None, guild_dir='configs/'):
     return config
 
 
-def recursive_update(base: dict, extra: dict):
-    for k, v in extra.items():
-        if k in base and isinstance(base[k], dict) and isinstance(extra[k], dict):
-            recursive_update(base[k], extra[k])
-        else:
-            base[k] = extra[k]
-
-
-def save_config(config, *, global_path='global_configs.yml'):
+def save_config(config: ConfigDict, *, global_path: str = 'global_configs.yml'):
     global_config_path = os.getcwd() + '/' + global_path
     with open(global_config_path, mode='w', encoding='UTF-8') as file:
         YAML.dump(config, file)
 
 
-def save_guild_config(config, guild_id):
-    guild_configs_dir = os.getcwd() + '/configs/'
+def save_guild_config(config: ConfigDict, guild_id: int, *, guild_dir: str = 'configs/'):
+    guild_configs_dir = os.getcwd() + '/' + guild_dir
     with open(f'{guild_configs_dir}{guild_id}.yml', mode='w', encoding='UTF-8') as file:
         YAML.dump(config, file)
 
 
-def default():
+def default_global() -> ConfigDict:
     try:
         with open(DEFAULT_GLOBAL_CONFIG_PATH, encoding='UTF-8') as file:
             return YAML.load(file)
@@ -90,7 +96,7 @@ def default():
         raise FileNotFoundError('Could not find default Global Configuration File.') from e
 
 
-def default_guild():
+def default_guild() -> ConfigDict:
     try:
         return YAML.load(open(DEFAULT_GUILD_CONFIG_PATH, encoding='UTF-8'))
     except FileNotFoundError as e:

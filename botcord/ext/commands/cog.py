@@ -1,16 +1,30 @@
-import os
+from os.path import abspath as _abspath, dirname as _dirname
 
-from discord.ext.commands import Cog as _Cog
+from discord.ext.commands import Cog as _bruh_do_not_import_this_Cog
 
 from botcord.configs import YAML as _YAML, recursive_update as _recursive_update
 
 
 # noinspection PyAttributeOutsideInit
-class Cog(_Cog):
+class Cog(_bruh_do_not_import_this_Cog):
+    """
+    Same as :class:`discord.ext.commands.Cog` but extra configuration file features.
+    Allows the cog to conviniently save and access data from a config file.
+
+    Your custom extension class should inherit this class the same way you use the ordinary Cog.
+
+    ``config_init()`` must be called (only once) at the beginning before using config features
+    it loads any data from the config file on disk to be accessed via ``self.config`` as a dictionary
+
+    ``save_config()``, ``load_config()``, and ``refresh_config()`` are self-explanatory
+    """
     def config_init(self, file, path='configs.yml'):
         """PASS THE __file__ VARIABLE IN AS AN ARGUMENT FROM THE EXTENSION FILE,
         SO THE CONFIG PATH IS IN THE EXTENSION'S FOLDER AND NOT IN THE BOTCORD FILES HERE"""
-        self._config_dir = f'{os.path.dirname(os.path.abspath(file))}/{path}'
+        if getattr(self, '_configed', False):
+            raise RuntimeError('config_init() has already been called, but was called again')
+
+        self._config_dir = f'{_dirname(_abspath(file))}/{path}'
         self.load_config()
         self._configed = True
 
@@ -49,3 +63,7 @@ class Cog(_Cog):
 
     def cog_unload(self):
         self.save_config()
+        super().cog_unload()
+
+
+__all__ = ['Cog']

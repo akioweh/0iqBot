@@ -1,9 +1,13 @@
+from typing import Optional
+
+from discord import Guild, Role
+from discord.abc import GuildChannel
 from discord.utils import get as _get
 
 from botcord.functions import to_int as _int
 
 
-async def role(string, guild):
+async def role(string: str, guild: Guild) -> Optional[Role]:
     string = string.strip()
     if _role := guild.get_role(_int(string)):
         return _role
@@ -17,7 +21,7 @@ async def role(string, guild):
     return None
 
 
-async def channel(string, guild):
+async def channel(string: str, guild: Guild) -> Optional[GuildChannel]:
     string = string.strip()
     if _channel := guild.get_channel(_int(string)):
         return _channel
@@ -30,4 +34,5 @@ async def channel(string, guild):
 
     return None
 
-# End
+
+__all__ = ['role', 'channel']

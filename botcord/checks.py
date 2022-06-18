@@ -1,27 +1,32 @@
-from discord.ext import commands
-from discord.ext.commands import Context, MissingPermissions
+"""
+Additional check functions to restrict command execution
+
+same format/usage as builtin :package:`discord.ext.commands` checks
+"""
+
+from discord.ext.commands import Context, MissingPermissions, check as _to_check_func, has_permissions as _has_perms
 
 
 def guild_owner_or_perms(**perms):
-    has_perms = commands.has_permissions(**perms).predicate
+    has_perms = _has_perms(**perms).predicate
 
     async def check_func(ctx: Context):
         if ctx.guild is None:
             return False
         return ctx.guild.owner_id == ctx.author.id or await has_perms(ctx)
 
-    return commands.check(check_func)
+    return _to_check_func(check_func)
 
 
 def guild_admin_or_perms(**perms):
-    has_perms = commands.has_permissions(**perms).predicate
+    has_perms = _has_perms(**perms).predicate
 
     async def check_func(ctx: Context):
         if ctx.guild is None:
             return False
         return ctx.message.author.guild_permissions.administrator or await has_perms(ctx)
 
-    return commands.check(check_func)
+    return _to_check_func(check_func)
 
 
 def has_global_perms(**perms):
@@ -37,7 +42,7 @@ def has_global_perms(**perms):
 
         raise MissingPermissions(missing)
 
-    return commands.check(predicate)
+    return _to_check_func(predicate)
 
 
 def has_custom_perms(**perms):
@@ -54,4 +59,7 @@ def has_custom_perms(**perms):
 
         raise MissingPermissions(missing)
 
-    return commands.check(predicate)
+    return _to_check_func(predicate)
+
+
+__all__ = ['guild_owner_or_perms', 'guild_admin_or_perms', 'has_global_perms', 'has_custom_perms']

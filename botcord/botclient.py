@@ -1,39 +1,40 @@
-import asyncio
-import importlib
-import os
+from asyncio import WindowsSelectorEventLoopPolicy as Wsep, set_event_loop_policy as selp
 from contextlib import suppress
-from typing import Any, Dict, Hashable, List, Optional, Union
+from importlib import import_module
+from os import getcwd
+from typing import Optional
 
-import sys
 from aiohttp import ClientSession
 from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, Status
 from discord.ext import commands
 from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandOnCooldown, DisabledCommand,
                                          NoPrivateMessage, UserInputError)
+from sys import __stdout__, platform as __platform__, version_info as __version_info__
 
-from .configs import load_configs, new_guild_config, save_config, save_guild_config
+from .configs import ConfigDict, load_configs, new_guild_config, save_config, save_guild_config
 from .functions import *
 from .utils.errors import protect
 from .utils.extensions import get_all_extensions_from
 
 # Fix to stop aiohttp spamming errors in stderr when closing because that is uglier
-if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith('win'):
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+if __version_info__[0] == 3 and __version_info__[1] >= 8 and __platform__.startswith('win'):
+    selp(Wsep())
 
 
 class BotClient(commands.Bot):
     initialized: bool
     latest_message: Optional[Message]
-    configs: Dict[Hashable, Any]
-    guild_configs: Union[Dict[int, dict], tuple]
-    prefix: List[str]
-    guild_prefixes: Union[Dict[int, str], tuple]
+    configs: ConfigDict
+    guild_configs: dict[int, ConfigDict]
+    prefix: list[str]
+    guild_prefixes: dict[int, str]
 
     def __init__(self, **options):
         self.initialized = False
         global_configs, guild_configs = load_configs()
-        prefix_check = BotClient.mentioned_or_in_prefix if global_configs['bot'][
-            'reply_to_mentions'] else BotClient.in_prefix
+        prefix_check = BotClient.mentioned_or_in_prefix \
+            if global_configs['bot']['reply_to_mentions'] else BotClient.in_prefix
+
         self.__status = options.pop('status', None)
         self.__activity = options.pop('activity', None)
         super().__init__(**options,
@@ -50,7 +51,7 @@ class BotClient(commands.Bot):
         self.prefix = global_configs['bot']['prefix']
         self.guild_prefixes = {c['guild']['id']: c['bot']['prefix'] for c in self.guild_configs.values()}
 
-        exts = importlib.import_module(self.configs['bot']['extension_dir'], os.getcwd())
+        exts = import_module(self.configs['bot']['extension_dir'], getcwd())
         self.load_extensions(exts)
 
     def load_extensions(self, package):
@@ -122,7 +123,7 @@ class BotClient(commands.Bot):
     async def mentioned_or_in_prefix(bot, message):
         return commands.when_mentioned_or(*await BotClient.in_prefix(bot, message))(bot, message)
 
-    def guild_config(self, guild: Union[Guild, int]):
+    def guild_config(self, guild: Guild | int):
         if isinstance(guild, Guild):
             guild = guild.id
         if guild in self.guild_configs:
@@ -137,7 +138,7 @@ class BotClient(commands.Bot):
         raise FileNotFoundError(f'No Extension configs for guild {guild} found.')
 
     async def logm(self, message, tag="Main", sep="\n", channel=None):
-        sys.__stdout__.write(f"[{time_str()}] [{tag}]: {message}" + sep)
+        __stdout__.write(f"[{time_str()}] [{tag}]: {message}" + sep)
         if not channel:
             channel = self.latest_message.channel
         try:
