@@ -1,6 +1,7 @@
 from contextlib import suppress
 from importlib import import_module
 from os import getcwd
+from traceback import print_exception
 from typing import Optional
 
 from aiohttp import ClientSession
@@ -8,7 +9,7 @@ from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, 
 from discord.ext import commands
 from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandOnCooldown, DisabledCommand,
                                          NoPrivateMessage, UserInputError)
-from sys import __stdout__, platform as __platform__, version_info as __version_info__
+from sys import platform as __platform__, stderr, stdout, version_info as __version_info__
 
 from .configs import ConfigDict, load_configs, new_guild_config, save_config, save_guild_config
 from .functions import *
@@ -138,7 +139,7 @@ class BotClient(commands.Bot):
         raise FileNotFoundError(f'No Extension configs for guild {guild} found.')
 
     async def logm(self, message, tag="Main", sep="\n", channel=None):
-        __stdout__.write(f"[{time_str()}] [{tag}]: {message}" + sep)
+        stdout.write(f"[{time_str()}] [{tag}]: {message}" + sep)
         if not channel:
             channel = self.latest_message.channel
         try:
@@ -307,14 +308,24 @@ class BotClient(commands.Bot):
         if isinstance(exception, UserInputError):
             await context.reply('Invalid inputs.', delete_after=10)
             handled = True
-        if not handled:
-            #  Default command error handling
-            await super().on_command_error(context, exception)
 
         #  Additional logging for HTTP (networking) errors
         if isinstance(exception, HTTPException):
             log(f'An API Exception has occurred ({exception.code}): {exception.text}', tag='Error')
             context.reply(f'An API error occurred while executing the command. (API Error code: {exception.code})')
+
+        if not handled:
+            if self.extra_events.get('on_command_error', None):
+                return
+            if hasattr(context.command, 'on_error'):
+                return
+            cog = context.cog
+            # hasattr check is to see if the cog error handler has been overridden with a custom method
+            if cog and hasattr(cog.cog_command_error.__func__, '__cog_special_method__'):
+                return
+
+            print('Ignoring exception in command {}:'.format(context.command), file=stderr)
+            print_exception(type(exception), exception, exception.__traceback__, file=stderr)
 
     async def on_command_completion(self, context):
         pass
