@@ -49,7 +49,7 @@ class MessageHook(Cog):
         hooks: Optional[List[Webhook]] = await ctx.channel.webhooks()
         valid_hook: Optional[Webhook] = None
         for hook in hooks:
-            if hook.token is not None:
+            if hook.token is not None and hook.user == self.bot.user:
                 valid_hook = hook
                 break
         try:
