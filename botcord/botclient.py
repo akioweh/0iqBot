@@ -293,7 +293,17 @@ class BotClient(commands.Bot):
     async def on_command(self, context):
         pass
 
-    async def on_command_error(self, context, exception):
+    async def on_command_error(self, context, exception, *, fire_anyway=False):
+        if not fire_anyway:  # Normally we don't do anything here if another handler catches the error
+            if self.extra_events.get('on_command_error', None):
+                return
+            if hasattr(context.command, 'on_error'):
+                return
+            cog = context.cog
+            # hasattr check is to see if the cog error handler has been overridden with a custom method
+            if cog and hasattr(cog.cog_command_error.__func__, '__cog_special_method__'):
+                return
+
         handled = False
         if isinstance(exception, (CommandNotFound, DisabledCommand, CheckFailure)) or (context.command is None):
             handled = True
@@ -315,16 +325,7 @@ class BotClient(commands.Bot):
             context.reply(f'An API error occurred while executing the command. (API Error code: {exception.code})')
 
         if not handled:
-            if self.extra_events.get('on_command_error', None):
-                return
-            if hasattr(context.command, 'on_error'):
-                return
-            cog = context.cog
-            # hasattr check is to see if the cog error handler has been overridden with a custom method
-            if cog and hasattr(cog.cog_command_error.__func__, '__cog_special_method__'):
-                return
-
-            print('Ignoring exception in command {}:'.format(context.command), file=stderr)
+            print(f'Ignoring exception in command {context.command}:', file=stderr)
             print_exception(type(exception), exception, exception.__traceback__, file=stderr)
 
     async def on_command_completion(self, context):
