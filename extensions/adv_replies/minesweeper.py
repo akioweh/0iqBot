@@ -63,7 +63,16 @@ class MineSweeper(Cog):
             board_text += f'||{MineSweeper.EMOJI[value]}||'
         board_text.lstrip('\n')
 
-        await ctx.send(board_text)
+        # try to send using a webhook for custom pfp
+        for c in self.bot.commands:
+            if c.qualified_name == 'sendas':  # cross-extension dependency
+                fake_user = lambda: None
+                setattr(fake_user, 'name', 'MineSweeper Bot')
+                setattr(fake_user, 'avatar_url', 'https://ih1.redbubble.net/image.395422632.9241/bg,ffffff-flat,750x,075,f-pad,750x750,ffffff.u2.jpg')
+                await c(ctx, fake_user, text=board_text, delete=False)
+                break
+        else:  # backup in case message hook dependency doesn't exist
+            await ctx.send(board_text)
 
     @staticmethod
     def neighbors(x: int, y: int, pos: int) -> list[int]:
