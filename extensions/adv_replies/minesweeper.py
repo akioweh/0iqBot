@@ -1,7 +1,7 @@
 from random import sample
-from typing import Final, TYPE_CHECKING
+from typing import Final, Optional, TYPE_CHECKING
 
-from discord.ext.commands import Context, command
+from discord.ext.commands import CommandError, Context, MissingRequiredArgument, command
 
 from botcord.ext.commands import Cog
 
@@ -26,12 +26,17 @@ class MineSweeper(Cog):
     def __init__(self, bot):
         self.bot: BotClient = bot
 
-    @command(aliases=['ms'])
-    async def minesweeper(self, ctx: Context, width: int, height: int, mines: int):
-        """Generates minesweeper board using spoilers."""
+    @command(aliases=['ms'],
+             usage='<width> <height> [mines] OR\n'
+                   'iq [minesweeper|ms] <size>')
+    async def minesweeper(self, ctx: Context, width: int, height: int, mines: Optional[int] = None):
+        """Generates minesweeper board using spoilers.
+        When number of mines is unspecified, around 11% of the size is used."""
         # Checks to ensure valid input
         grids = width * height
         chars = grids * 7 + height - 1  # each square can take up to 7 unicode characters
+        if mines is None:
+            mines = grids // 9
         if width <= 0 or height <= 0:
             await ctx.reply('Board size is invalid.')
             return
@@ -74,6 +79,33 @@ class MineSweeper(Cog):
                                pos + x + 1]
         neighbor_pos: list[int] = list(pos for pos, valid in zip(pos_list, pos_valid) if valid)
         return neighbor_pos
+
+    @minesweeper.error
+    async def try_to_handle_goddam_dynamic_syntax(self, ctx: Context, error):
+        """This junk here tries to allow the minesweeper command to accept an argument format
+        with only one argument, ``size``, which generates a square board (with the default 11% bombs) \n
+        Annoyingly, I have to take care of this alongside the other two- and three- argument cases \n
+        I tried to make it super robust but that required lots of complicated checks and chaining logic"""
+        try:
+            # If error not due to supplying only one integer argument,
+            # skip rest of codeblock (by raising exception)
+            # then call default error handler because we do not deal with anything else
+            if not isinstance(error, MissingRequiredArgument):
+                raise CommandError()
+            if not (len(ctx.args) == 3 and ctx.args[0] == self and isinstance(ctx.args[1], Context)):
+                raise CommandError()
+            size = ctx.args[2]  # 1st is self, 2nd is ctx
+            if not isinstance(size, int):
+                raise CommandError()
+
+            await ctx.invoke(self.minesweeper, size, size)
+
+        except CommandError as e:
+            if not e.args:  # normally it is a blank CommandError raised from above
+                e = error
+                # but if e has content then it must be raised from the above ctx.invoke
+                # then it is unexpected and should be passed on (not overwrite it with original error)
+            await ctx.bot.on_command_error(ctx, e, fire_anyway=True)
 
 
 def setup(bot: 'BotClient'):
