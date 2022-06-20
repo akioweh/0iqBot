@@ -1,3 +1,4 @@
+from contextlib import suppress
 from typing import List, Optional, TYPE_CHECKING
 
 from discord import AllowedMentions, Forbidden, HTTPException, NotFound, User, Webhook
@@ -13,7 +14,7 @@ class MessageHook(Cog):
         self.mentions = AllowedMentions(everyone=False, users=True, roles=False)
 
     @command(aliases=['say'])
-    async def send(self, ctx: Context, *, text=None):
+    async def send(self, ctx: Context, *, text=None, delete=True):
         if (text is None) and (ctx.message.attachments is None):
             return
         if len(text) > 2000:
@@ -25,17 +26,16 @@ class MessageHook(Cog):
             attachments = [await item.to_file() for item in ctx.message.attachments]
 
         await ctx.send(content=text, files=attachments, reference=ctx.message.reference, allowed_mentions=self.mentions)
-        try:
-            await ctx.message.delete()
-        except (Forbidden, NotFound):
-            pass
+        if delete:
+            with suppress(Forbidden, NotFound):
+                await ctx.message.delete()
 
     @command(aliases=['repost'])
     async def resend(self, ctx: Context, *, text=None):
         await self.sendas(ctx, user=ctx.author, text=text)
 
     @command()
-    async def sendas(self, ctx: Context, user: Optional[User] = None, *, text=None):
+    async def sendas(self, ctx: Context, user: Optional[User] = None, *, text=None, delete=True):
         if (user is None) or ((text is None) and (ctx.message.attachments is None)):
             return
         if len(text) > 2000:
@@ -61,10 +61,9 @@ class MessageHook(Cog):
                                   avatar_url=user.avatar_url,
                                   files=attachments,
                                   allowed_mentions=self.mentions)
-            try:
-                await ctx.message.delete()
-            except (Forbidden, NotFound):
-                pass
+            if delete:
+                with suppress(Forbidden, NotFound):
+                    await ctx.message.delete()
 
         except HTTPException as error:
             if error.code == 30007:
