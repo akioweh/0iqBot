@@ -293,17 +293,21 @@ class BotClient(commands.Bot):
         pass
 
     async def on_command_error(self, context, exception):
+        handled = False
         if isinstance(exception, (CommandNotFound, DisabledCommand, CheckFailure)) or (context.command is None):
-            pass
-        elif isinstance(exception, NoPrivateMessage):
+            handled = True
+        if isinstance(exception, NoPrivateMessage):
             await context.reply('This does not work in Direct Messages!', delete_after=10)
-        elif isinstance(exception, CommandOnCooldown):
+            handled = True
+        if isinstance(exception, CommandOnCooldown):
             with suppress(Forbidden):
                 await context.reply(f'Command is on cooldown. Please try again in {exception.retry_after} seconds.',
                                     delete_after=10)
-        elif isinstance(exception, UserInputError):
+            handled = True
+        if isinstance(exception, UserInputError):
             await context.reply('Invalid inputs.', delete_after=10)
-        else:
+            handled = True
+        if not handled:
             #  Default command error handling
             await super().on_command_error(context, exception)
 
