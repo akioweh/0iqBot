@@ -1,7 +1,8 @@
 from random import sample
 from typing import Final, Optional, TYPE_CHECKING
 
-from discord.ext.commands import CommandError, Context, MissingRequiredArgument, command
+from discord import Message
+from discord.ext.commands import CommandError, Context, MissingRequiredArgument, group
 
 from botcord.ext.commands import Cog
 
@@ -26,9 +27,10 @@ class MineSweeper(Cog):
     def __init__(self, bot):
         self.bot: BotClient = bot
 
-    @command(aliases=['ms'],
-             usage='<width> <height> [mines] OR\n'
-                   'iq [minesweeper|ms] <size>')
+    @group(aliases=['ms'],
+           usage='<width> <height> [mines] OR\n'
+                 'iq [minesweeper|ms] <size>',
+           invoke_without_command=True)
     async def minesweeper(self, ctx: Context, width: int, height: int, mines: Optional[int] = None):
         """Generates minesweeper board using spoilers.
         When number of mines is unspecified, around 11% of the size is used."""
@@ -115,6 +117,19 @@ class MineSweeper(Cog):
                 # but if e has content then it must be raised from the above ctx.invoke
                 # then it is unexpected and should be passed on (not overwrite it with original error)
             await ctx.bot.on_command_error(ctx, e, fire_anyway=True)
+
+    @minesweeper.command()
+    async def reveal(self, ctx: Context):
+        """Reveals a minesweeper board by removing all spoilers"""
+        if not (ctx.message.reference and isinstance(ctx.message.reference.resolved, Message)):
+            await ctx.reply('Reply to the minesweeper board you want to reveal.', delete_after=5)
+            return
+        board = ctx.message.reference.resolved.content
+        if not ('||⬛||' in board or '||💥||' in board) or ' ' in board:
+            await ctx.reply('That doesn\'t seem like a valid minesweeper board.')
+            return
+        revealed = board.replace('||', '')
+        await ctx.reply(revealed)
 
 
 def setup(bot: 'BotClient'):
