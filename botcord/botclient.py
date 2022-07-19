@@ -251,7 +251,7 @@ class BotClient(commands.Bot):
     async def on_guild_role_update(self, before, after):
         pass
 
-    async def on_guild_emojis_update(self, before, after):
+    async def on_guild_emojis_update(self, guild, before, after):
         pass
 
     async def on_guild_available(self, guild):
