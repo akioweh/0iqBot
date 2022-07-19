@@ -26,7 +26,11 @@ class KeepRoles(Cog):
         self.save_config()
 
     @Cog.listener()
-    async def on_member_join(self, member: Member):
+    async def on_verification_complete(self, member: Member):
+        # On verification complete instead of on member join because
+        # giving roles automatically skips member verification
+        # which causes FAST automatic verification
+        # and defeats the purpose of using skill to get a short time
         try:
             role_ids = self.config['keep_roles']['logs'][member.id][member.guild.id]
         except KeyError:
