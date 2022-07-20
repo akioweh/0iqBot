@@ -83,6 +83,7 @@ class MathParser:
                 return val
 
             else:
+                # noinspection PyTypeChecker
                 raise TypeError(f'Non-math-y expression {ast.dump(node)} of type {type(node)}')
 
         else:
