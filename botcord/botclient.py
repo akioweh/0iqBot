@@ -1,3 +1,4 @@
+from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module
 from os import getcwd
@@ -38,6 +39,7 @@ class BotClient(commands.Bot):
 
         self.__status = options.pop('status', None)
         self.__activity = options.pop('activity', None)
+        process_count = options.pop('multiprocessing', 0)
         super().__init__(**options,
                          activity=Activity(name='...Bot Initializing...', type=0),
                          status=Status('offline'),
@@ -46,6 +48,7 @@ class BotClient(commands.Bot):
                          intents=Intents.all())
         self.latest_message = None
         self.aiohttp_session = ClientSession(loop=self.loop)
+        self.process_pool = ProcessPoolExecutor(max_workers=process_count)
 
         self.configs = global_configs
         self.guild_configs = guild_configs
@@ -378,5 +381,8 @@ class BotClient(commands.Bot):
         self.save_guild_configs()
         await self.aiohttp_session.close()
         await super().close()
+
+    def __del__(self):
+        self.process_pool.shutdown(wait=True)
 
 # End
