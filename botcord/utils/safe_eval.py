@@ -54,7 +54,6 @@ class MathParser:
             def disallowed_op(op_type: ast.operator | ast.unaryop) -> Callable[[...], NoReturn]:
                 def func(*_):
                     raise ArithmeticError(f'Operation {op_type.__name__} is not allowed')
-
                 return func
 
             for k, v in self.bin_ops.items():
@@ -64,18 +63,18 @@ class MathParser:
                 if v not in allowed_operations:
                     self.un_ops[k] = disallowed_op(k)
 
-    def eval_(self, node: ast.Expression | ast.expr) -> ast.expr | int | float:
+    def eval(self, node: ast.Expression | ast.expr) -> ast.expr | int | float:
         if isinstance(node, ast.Expression):
-            return self.eval_(node.body)
+            return self.eval(node.body)
 
         elif isinstance(node, ast.expr):
             if isinstance(node, ast.BinOp):
                 # noinspection PyTypeChecker
-                return self.bin_ops[type(node.op)](self.eval_(node.left), self.eval_(node.right))
+                return self.bin_ops[type(node.op)](self.eval(node.left), self.eval(node.right))
 
             elif isinstance(node, ast.UnaryOp):
                 # noinspection PyTypeChecker
-                return self.un_ops[type(node.op)](self.eval_(node.operand))
+                return self.un_ops[type(node.op)](self.eval(node.operand))
 
             elif isinstance(node, ast.Constant):
                 if not isinstance(val := node.value, Number):
@@ -94,4 +93,4 @@ class MathParser:
         # ast.parse() in eval mode always returns ast.Expression object; the stub type is inaccurate
         # noinspection PyTypeChecker
         ast_data: ast.Expression = ast.parse(expr, mode='eval')
-        return self.eval_(ast_data)
+        return self.eval(ast_data)
