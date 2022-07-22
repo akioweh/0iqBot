@@ -90,7 +90,7 @@ class TwentyFour(Cog):
             try:  # verify that the answer is valid; uses all four numbers, and only once each
                 operators = '+-*/'
                 numbers = "".join(q_msg.content.strip("`").split())
-                allowed_chars = operators + numbers
+                allowed_chars = operators + numbers + '()'
                 if not all(i in allowed_chars for i in answer):
                     raise ValueError
                 clean = answer.replace('(', '').replace(')', '').replace(' ', '')  # only keep numbers and operators
