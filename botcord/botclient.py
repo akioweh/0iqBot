@@ -337,13 +337,11 @@ class BotClient(commands.Bot):
 
     async def on_command_error(self, context, exception, *, fire_anyway=False):
         if not fire_anyway:  # Normally we don't do anything here if another handler catches the error
-            if self.extra_events.get('on_command_error', None):
-                return
             if hasattr(context.command, 'on_error'):
                 return
             cog = context.cog
             # hasattr check is to see if the cog error handler has been overridden with a custom method
-            if cog and hasattr(cog.cog_command_error.__func__, '__cog_special_method__'):
+            if cog and cog.has_error_handler():
                 return
 
         handled = False
