@@ -103,9 +103,9 @@ class TwentyFour(Cog):
                     raise ValueError
                 if not all(clean[i] in numbers for i in (0, 2, 4, 6)):  # make sure the numbers are in their positions
                     raise ValueError
-                nums = clean[0] + clean[2] + clean[4] + clean[6]  # the digits only as a 4-long string
-                if not all(i in nums for i in nums):  # make sure each number is used once and only once
-                    raise ValueError
+                nums = [clean[0], clean[2], clean[4], clean[6]]  # the digits only as a 4-long string
+                for i in numbers:  # make sure each number is used and used only once
+                    nums.remove(i)
 
             except ValueError:
                 await ctx.reply('That doesn\'t seem like a valid answer', delete_after=5)
