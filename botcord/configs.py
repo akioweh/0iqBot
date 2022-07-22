@@ -98,7 +98,8 @@ def default_global() -> ConfigDict:
 
 def default_guild() -> ConfigDict:
     try:
-        return YAML.load(open(DEFAULT_GUILD_CONFIG_PATH, encoding='UTF-8'))
+        with open(DEFAULT_GUILD_CONFIG_PATH, encoding='UTF-8') as file:
+            return YAML.load(file)
     except FileNotFoundError as e:
         raise FileNotFoundError('Could not find default Guild Configuration File.') from e
 # End
