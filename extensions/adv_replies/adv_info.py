@@ -1,6 +1,8 @@
+import asyncio
+from datetime import datetime
 from typing import Optional, Union
 
-from discord import PartialEmoji, Role, TextChannel, User
+from discord import Message, PartialEmoji, Role, TextChannel, User
 from discord.ext.commands import Cog, Context, group
 from discord.ext.commands.converter import Greedy, UserConverter
 from discord.ext.commands.errors import UserNotFound
@@ -65,6 +67,28 @@ class AdvInfo(Cog):
             await ctx.reply(f'`{role.mention}`')
         else:
             await ctx.reply('Role not found (Only works with roles in THIS server).', delete_after=10)
+
+    @group(invoke_without_command=True)
+    async def status(self, ctx: Context):
+        await ctx.reply('TODO: show bot\'s status and various metrics')
+
+    @status.command()
+    async def ping(self, ctx: Context):
+        """Calculates Websocket and True Ping"""
+        p_t = asyncio.create_task(ctx.reply('Pinging...'))
+        await asyncio.sleep(0)
+
+        def ping_msg_check(msg: Message):
+            return msg.author.id == self.bot.user.id and msg.content == 'Pinging...'
+
+        await self.bot.wait_for('message', check=ping_msg_check, timeout=5)
+        stop = datetime.utcnow()
+        start = ctx.message.created_at
+        websocket_ping = self.bot.latency
+
+        await ctx.send(f'Websocket Ping: `{websocket_ping * 1000}`ms \n'
+                       f'True Ping: `{(stop - start).total_seconds() * 1000 / 2}`ms')
+        await p_t
 
 
 def setup(bot):
