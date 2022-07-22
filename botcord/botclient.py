@@ -1,9 +1,11 @@
+from collections.abc import Coroutine
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module
 from os import getcwd
+from signal import SIGINT, SIG_IGN, signal
 from traceback import print_exception
-from typing import Optional
+from typing import Callable, Optional, ParamSpec, TypeVar
 
 from aiohttp import ClientSession
 from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, Status
@@ -23,32 +25,47 @@ if __version_info__[0] == 3 and __version_info__[1] >= 8 and __platform__.starts
     set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 
+# Subprocess Error handling stuff
+def _subprocess_initializer():
+    signal(SIGINT, SIG_IGN)
+
+
+# Typing pre-definitions
+P = ParamSpec('P')
+T = TypeVar('T')
+
+
 class BotClient(commands.Bot):
-    initialized: bool
+    connect_init_ed: bool
+    async_init_ed: bool
     latest_message: Optional[Message]
+    aiohttp_session: Optional[ClientSession]
+    process_pool: Optional[ProcessPoolExecutor]
     configs: ConfigDict
     guild_configs: dict[int, ConfigDict]
     prefix: list[str]
     guild_prefixes: dict[int, str]
 
     def __init__(self, **options):
-        self.initialized = False
+        self.async_init_ed = False
+        self.connect_init_ed = False
+
         global_configs, guild_configs = load_configs()
         prefix_check = BotClient.mentioned_or_in_prefix \
             if global_configs['bot']['reply_to_mentions'] else BotClient.in_prefix
-
+        process_count = options.pop('multiprocessing', 0)
         self.__status = options.pop('status', None)
         self.__activity = options.pop('activity', None)
-        process_count = options.pop('multiprocessing', 0)
         super().__init__(**options,
                          activity=Activity(name='...Bot Initializing...', type=0),
                          status=Status('offline'),
                          command_prefix=prefix_check,
                          max_messages=global_configs['bot']['message_cache'],
                          intents=Intents.all())
+
         self.latest_message = None
-        self.aiohttp_session = ClientSession(loop=self.loop)
-        self.process_pool = ProcessPoolExecutor(max_workers=process_count)
+        self.aiohttp_session = None
+        self.process_pool = ProcessPoolExecutor(max_workers=process_count, initializer=_subprocess_initializer)
 
         self.configs = global_configs
         self.guild_configs = guild_configs
@@ -58,22 +75,39 @@ class BotClient(commands.Bot):
         exts = import_module(self.configs['bot']['extension_dir'], getcwd())
         self.load_extensions(exts)
 
-    def load_extensions(self, package):
-        extensions = get_all_extensions_from(package)
-        for extension in extensions:
-            self.load_extension(extension)
+    async def __init_async__(self) -> bool:
+        """Used to initialize whatever that requires to run inside an event loop
+        (called after the event loop has been initialized)"""
+        if self.async_init_ed:
+            return False
+        self.async_init_ed = True
+        self.aiohttp_session = ClientSession(loop=self.loop)
 
-    async def _init(self) -> bool:
+        log('Asynchronous Initialization Finished')
+        return True
+
+    async def __init_connect__(self) -> bool:
+        """Used to initialized whatever that require a fully established discord connection
+        (called after logged in and connected to Discord)"""
+        if self.connect_init_ed:
+            return False
+        self.connect_init_ed = True
+
         with protect():
-            if self.initialized:
-                return False
             await self.validate_guild_configs()
             self.save_guild_configs()
 
         await self.change_presence(activity=self.__activity, status=self.__status)
-        self.initialized = True
-        log('Bot finished Initializing')
+        log('Post-Connection Initialization Finished')
         return True
+
+    def to_process(self, func: Callable[P, T], *args) -> Coroutine[None, P, T]:
+        return self.loop.run_in_executor(self.process_pool, func, *args)
+
+    def load_extensions(self, package):
+        extensions = get_all_extensions_from(package)
+        for extension in extensions:
+            self.load_extension(extension)
 
     @staticmethod
     async def blocked_check(ctx: commands.Context):
@@ -151,8 +185,8 @@ class BotClient(commands.Bot):
             pass
 
     async def on_ready(self):
-        await self._init()
         log(f"User Logged in as <{self.user}>", tag="Connection")
+        await self.__init_connect__()
 
     async def on_connect(self):
         log(f"Discord Connection Established. <{self.user}>", tag="Connection")
@@ -339,7 +373,7 @@ class BotClient(commands.Bot):
 
     async def validate_guild_configs(self):
         for guild in self.guilds:
-            # Create config for guild if doesn't exist
+            # Create config for guild if it doesn't exist
             if guild.id not in self.guild_configs:
                 self.guild_configs[guild.id] = self.create_guild_config(guild)
 
@@ -375,6 +409,11 @@ class BotClient(commands.Bot):
 
     def run(self, *args, **kwargs):
         super().run(*args, *kwargs)
+        self.__close_sync__()
+
+    async def start(self, *args, **kwargs):
+        await self.__init_async__()
+        await super().start(*args, **kwargs)
 
     async def close(self):
         save_config(self.configs)
@@ -382,7 +421,10 @@ class BotClient(commands.Bot):
         await self.aiohttp_session.close()
         await super().close()
 
-    def __del__(self):
+    async def __close_async__(self):  # todo: make the shutdown process automatically call this
+        pass
+
+    def __close_sync__(self):
         self.process_pool.shutdown(wait=True)
 
 # End
