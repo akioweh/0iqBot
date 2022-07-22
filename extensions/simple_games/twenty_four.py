@@ -1,6 +1,5 @@
 """24 but twenty_four because python symbols can't start with a number"""
 
-import asyncio
 from fractions import Fraction
 from operator import add, mul, sub, truediv
 from random import randint
@@ -37,13 +36,13 @@ class TwentyFour(Cog):
     @twenty_four.command(aliases=['q', 'generate'])
     async def new(self, ctx: Context):
         """Generate a 24-game question with valid solutions"""
-        q = await asyncio.to_thread(TwentyFour._new_q)  # avoid blocking main thread
-        await ctx.reply(f'`{" ".join(str(i) for i in q)}`')
+        question = await self.bot.to_process(TwentyFour._new_q)  # subprocess offloading
+        await ctx.reply(f'`{" ".join(str(i) for i in question)}`')
 
     @twenty_four.command(aliases=['reveal'], ignore_extra=False)
     async def solve(self, ctx: Context, a: int, b: int, c: int, d: int):
         """Find solutions to a 24-game question"""
-        answers = await asyncio.to_thread(TwentyFour.find_solutions, [a, b, c, d])  # avoid blocking main thread
+        answers = await self.bot.to_process(TwentyFour.find_solutions, [a, b, c, d])  # subprocess offloading
         if answers:
             count = len(answers)
             await ctx.reply(f'`{answers[0]}`{f"... and {count - 1} more" if count > 1 else ""}')
@@ -55,9 +54,10 @@ class TwentyFour(Cog):
         """Submit your answer to a 24-game question (by replying)
         and get feedback on whether it is correct or not"""
         if not ctx.message.reference:
-            await ctx.reply('Reply to the question you are the answer submitting for')
+            await ctx.reply('Reply to the question you are submitting the answer for', delete_after=5)
             return
         if not isinstance(q_msg := ctx.message.reference.resolved, Message):
+            await ctx.reply('Can\'t resolve the refererred message', delete_after=5)
             return
 
         try:
@@ -65,7 +65,7 @@ class TwentyFour(Cog):
             if len(q) != 4 or any((not 0 <= i <= 9) for i in q):
                 raise ValueError
         except ValueError:
-            await ctx.reply('That doesn\'t seem like a valid 24-game question')
+            await ctx.reply('That doesn\'t seem like a valid 24-game question', delete_after=5)
             return
 
         try:
@@ -78,18 +78,18 @@ class TwentyFour(Cog):
             if ns != '':
                 raise ValueError
         except ValueError:
-            await ctx.reply('That doesn\'t seem like a valid answer')
+            await ctx.reply('That doesn\'t seem like a valid answer', delete_after=5)
             return
 
         try:
             val = self.parser.parse(answer)
         except SyntaxError:
-            await ctx.reply('Invalid expression syntax.')
+            await ctx.reply('Invalid expression syntax.', delete_after=5)
         except TypeError:
-            await ctx.reply('Invalid expression content.')
+            await ctx.reply('Invalid expression content.', delete_after=5)
         except ArithmeticError:
             await ctx.reply('Only four basic operations are allowed: + - * / \n'
-                            '(and no leading minus because that\'s negation, not subtraction)')
+                            '(and no leading minus because that\'s negation, not subtraction)', delete_after=5)
         else:
             if math.isclose(val, 24):
                 await ctx.reply(f'Correct answer. Took you `{ctx.message.created_at - q_msg.created_at}`')
