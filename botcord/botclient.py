@@ -65,7 +65,9 @@ class BotClient(commands.Bot):
 
         self.latest_message = None
         self.aiohttp_session = None
-        self.process_pool = ProcessPoolExecutor(max_workers=process_count, initializer=_subprocess_initializer)
+        self.process_pool = None
+        if process_count != 0:
+            self.process_pool = ProcessPoolExecutor(max_workers=process_count, initializer=_subprocess_initializer)
 
         self.configs = global_configs
         self.guild_configs = guild_configs
@@ -102,6 +104,9 @@ class BotClient(commands.Bot):
         return True
 
     def to_process(self, func: Callable[P, T], *args) -> Coroutine[None, P, T]:
+        if self.process_pool is None:
+            raise RuntimeError('No process pool was configured to initialize (pass non-zero process count to __init__'
+                               'option with key "multiprocessing" to initialize a process pool)')
         return self.loop.run_in_executor(self.process_pool, func, *args)
 
     def load_extensions(self, package):
@@ -425,6 +430,7 @@ class BotClient(commands.Bot):
         pass
 
     def __close_sync__(self):
-        self.process_pool.shutdown(wait=True)
+        if self.process_pool is not None:
+            self.process_pool.shutdown(wait=True)
 
 # End
