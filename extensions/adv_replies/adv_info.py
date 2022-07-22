@@ -77,17 +77,22 @@ class AdvInfo(Cog):
         """Calculates Websocket and True Ping"""
         p_t = asyncio.create_task(ctx.reply('Pinging...'))
         await asyncio.sleep(0)
+        start1 = datetime.utcnow()
+        start2 = ctx.message.created_at
 
         def ping_msg_check(msg: Message):
             return msg.author.id == self.bot.user.id and msg.content == 'Pinging...'
 
-        await self.bot.wait_for('message', check=ping_msg_check, timeout=5)
-        stop = datetime.utcnow()
-        start = ctx.message.created_at
+        ping_msg = await self.bot.wait_for('message', check=ping_msg_check, timeout=5)
+        stop1 = datetime.utcnow()
+        stop2 = ping_msg.created_at
+        delta1 = (stop1 - start1).total_seconds() * 1000
+        delta2 = (stop2 - start2).total_seconds() * 1000
         websocket_ping = self.bot.latency
 
         await ctx.send(f'Websocket Ping: `{websocket_ping * 1000}`ms \n'
-                       f'True Ping: `{(stop - start).total_seconds() * 1000 / 2}`ms')
+                       f'True Ping (bot-based): `{delta1}`ms \n'
+                       f'True Ping (message-based): `{delta2}`ms')
         await p_t
 
 
