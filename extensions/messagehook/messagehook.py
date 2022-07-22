@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import suppress
 from typing import List, Optional, TYPE_CHECKING
 
@@ -8,87 +9,99 @@ if TYPE_CHECKING:
     import botcord
 
 
+# noinspection SpellCheckingInspection
 class MessageHook(Cog):
     def __init__(self, bot: 'botcord.BotClient'):
         self.bot = bot
         self.mentions = AllowedMentions(everyone=False, users=True, roles=False)
 
     @command(aliases=['say'])
-    async def send(self, ctx: Context, *, text=None, delete=True):
+    async def send(self, ctx: Context, *, text: str = None, delete: bool = True):
         if (text is None) and (ctx.message.attachments is None):
             return
         if len(text) > 2000:
             await ctx.reply('Messages must be 2000 or fewer in length. (nitro abuse smh)', delete_after=10)
             return
 
-        attachments = []
-        if ctx.message.attachments:
-            attachments = [await item.to_file() for item in ctx.message.attachments]
+        attachments = await asyncio.gather(*(item.to_file() for item in ctx.message.attachments))
 
-        await ctx.send(content=text, files=attachments, reference=ctx.message.reference, allowed_mentions=self.mentions)
         if delete:
-            with suppress(Forbidden, NotFound):
-                await ctx.message.delete()
+            t1 = asyncio.create_task(ctx.message.delete())
+        t2 = asyncio.create_task(ctx.send(content=text,
+                                          files=attachments,
+                                          reference=ctx.message.reference,
+                                          allowed_mentions=self.mentions))
+
+        with suppress(Forbidden, NotFound):
+            if delete:
+                await asyncio.gather(t1, t2)
+            else:
+                await t2
 
     @command(aliases=['repost'])
-    async def resend(self, ctx: Context, *, text=None):
+    async def resend(self, ctx: Context, *, text: str = None):
         await self.sendas(ctx, user=ctx.author, text=text)
 
     @command()
-    async def sendas(self, ctx: Context, user: Optional[User] = None, *, text=None, delete=True):
+    async def sendas(self, ctx: Context, user: Optional[User] = None, *, text: str = None, delete: bool = True):
         if (user is None) or ((text is None) and (ctx.message.attachments is None)):
             return
         if len(text) > 2000:
             await ctx.reply('Messages must be 2000 or fewer in length. (nitro abuse smh)', delete_after=10)
             return
 
-        attachments = []
-        if ctx.message.attachments:
-            attachments = [await item.to_file() for item in ctx.message.attachments]
+        attachments = await asyncio.gather(*(item.to_file() for item in ctx.message.attachments))
 
-        hooks: Optional[List[Webhook]] = await ctx.channel.webhooks()
-        valid_hook: Optional[Webhook] = None
-        for hook in hooks:
-            if hook.token is not None and hook.user == self.bot.user:
-                valid_hook = hook
-                break
         try:
+            hooks: Optional[List[Webhook]] = await ctx.channel.webhooks()
+            valid_hook: Optional[Webhook] = None
+            for hook in hooks:
+                if hook.token:
+                    valid_hook = hook
+                    break
+
             if not valid_hook:
                 valid_hook = await ctx.channel.create_webhook(name='MessageHook')
 
-            await valid_hook.send(content=text,
-                                  username=user.name,
-                                  avatar_url=user.avatar_url,
-                                  files=attachments,
-                                  allowed_mentions=self.mentions)
             if delete:
-                with suppress(Forbidden, NotFound):
-                    await ctx.message.delete()
+                t1 = asyncio.create_task(ctx.message.delete())
+            t2 = asyncio.create_task(valid_hook.send(content=text,
+                                                     username=user.name,
+                                                     avatar_url=user.avatar_url,
+                                                     files=attachments,
+                                                     allowed_mentions=self.mentions))
+            with suppress(Forbidden, NotFound):
+                if delete:
+                    await asyncio.gather(t1, t2)
+                else:
+                    await t2
+
+        except Forbidden:
+            with suppress(Forbidden):
+                await ctx.reply('Missing Permissions', delete_after=5)
 
         except HTTPException as error:
             if error.code == 30007:
-                await ctx.reply('All existing webhooks are unusable (please delete). Failed to create new one: '
-                                'Maximum number of webhooks in this channel reached (10).')
-            else:
-                await ctx.reply('Failed to send message.', delete_after=10)
-                print(error)
+                await ctx.reply('All existing webhooks are unusable (please delete). '
+                                'Failed to create new one: Maximum number of webhooks in this channel reached (10).')
 
     @command()
-    async def cleanhooks(self, ctx, *args):
-        if args:
-            return
+    async def cleanhooks(self, ctx: Context):
         if not ctx.guild:
             return
-        hooks: Optional[List[Webhook]] = await ctx.guild.webhooks()
-        if not hooks:
-            await ctx.reply('No hooks cleaned.')
-            return
-        deleted = 0
-        for hook in hooks:
-            if (hook.name == 'MessageHook') or (hook.user == ctx.bot.user):
-                await hook.delete()
-                deleted += 1
-        await ctx.reply(f'Deleted {deleted} hook{"s" if deleted > 1 else ""}.')
+
+        try:
+            hooks: Optional[List[Webhook]] = await ctx.guild.webhooks()
+            delete_ables = [hook for hook in hooks if hook.name == 'MessageHook' or hook.user == ctx.bot.user]
+            if not delete_ables:
+                await ctx.reply('No hooks cleaned.')
+                return
+
+            await asyncio.gather(*(hook.delete() for hook in delete_ables))
+            await ctx.reply(f'Deleted {len(delete_ables)} hooks.')
+        except Forbidden:
+            with suppress(Forbidden):
+                await ctx.reply('Missing Permissions', delete_after=5)
 
 
 def setup(bot: 'botcord.BotClient'):
