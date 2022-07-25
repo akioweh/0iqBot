@@ -6,6 +6,11 @@ from discord.ext.commands import CommandError, Context, MissingRequiredArgument,
 
 from botcord.ext.commands import Cog
 
+try:
+    from ..messagehook.messagehook import MessageHook  # nice import name
+except ImportError:  # if MessageHook extension is not installed
+    MessageHook = None
+
 if TYPE_CHECKING:
     from botcord import BotClient
 
@@ -66,13 +71,13 @@ class MineSweeper(Cog):
         board_text.lstrip('\n')
 
         # try to send using a webhook for custom pfp
-        for c in self.bot.commands:
-            if c.qualified_name == 'sendas':  # cross-extension dependency
-                fake_user = lambda: None
-                setattr(fake_user, 'name', 'MineSweeper Bot')
-                setattr(fake_user, 'avatar_url', 'https://ih1.redbubble.net/image.395422632.9241/bg,ffffff-flat,750x,075,f-pad,750x750,ffffff.u2.jpg')
-                await c(ctx, fake_user, text=board_text, delete=False)
-                break
+        if MessageHook is not None:  # cross-extension dependency
+            await MessageHook.send(
+                    ctx.channel,
+                    board_text,
+                    'MineSweeper Bot',
+                    'https://ih1.redbubble.net/image.395422632.9241/bg,ffffff-flat,750x,075,f-pad,750x750,ffffff.u2.jpg'
+            )
         else:  # backup in case message hook dependency doesn't exist
             await ctx.send(board_text)
 
