@@ -2,10 +2,10 @@ from collections.abc import Coroutine
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module
-from os import getcwd
+from os import getcwd, getenv
 from signal import SIGINT, SIG_IGN, signal
 from traceback import print_exception
-from typing import Callable, Optional, ParamSpec, TypeVar
+from typing import Callable, Final, Optional, ParamSpec, TypeVar
 
 from aiohttp import ClientSession
 from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, Status
@@ -47,6 +47,7 @@ class BotClient(commands.Bot):
     guild_prefixes: dict[int, str]
 
     def __init__(self, **options):
+        self.DEBUG: Final = True if getenv('DEBUG', 'false').lower() != 'false' else False
         self.async_init_ed = False
         self.connect_init_ed = False
 
@@ -76,6 +77,11 @@ class BotClient(commands.Bot):
 
         exts = import_module(self.configs['bot']['extension_dir'], getcwd())
         self.load_extensions(exts)
+
+        if self.DEBUG:
+            # noinspection PyProtectedMember
+            from .utils._debug import on_command_error as debug_on_command_error
+            self.on_command_error = debug_on_command_error
 
     async def __init_async__(self) -> bool:
         """Used to initialize whatever that requires to run inside an event loop
