@@ -1,9 +1,9 @@
 """Custom Error Classes"""
 
-from discord.ext.commands import CommandInvokeError
+from discord.ext.commands import CommandInvokeError as _CommandInvokeError
 
 
-class ExtensionDisabledGuild(CommandInvokeError):
+class ExtensionDisabledGuild(_CommandInvokeError):
     """Raised when a command/etc. is invoked
     in a guild that doesn't have it enabled
 
