@@ -7,13 +7,12 @@ from signal import SIGINT, SIG_IGN, signal
 from traceback import print_exception
 from typing import Callable, Final, Optional, ParamSpec, TypeVar
 
-import sys
 from aiohttp import ClientSession
 from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, Status
 from discord.ext import commands
 from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandOnCooldown, DisabledCommand,
                                          NoPrivateMessage, UserInputError)
-from sys import platform as __platform__, stderr, stdout, version_info as __version_info__
+from sys import exc_info, platform as __platform__, stderr, stdout, version_info as __version_info__
 
 from .configs import ConfigDict, load_configs, new_guild_config, save_config, save_guild_config
 from .errors import ExtensionDisabledGuild
@@ -24,6 +23,7 @@ from .utils.extensions import get_all_extensions_from
 # Fix to stop aiohttp spamming errors in stderr when closing because that is uglier
 if __version_info__[0] == 3 and __version_info__[1] >= 8 and __platform__.startswith('win'):
     from asyncio import WindowsSelectorEventLoopPolicy, set_event_loop_policy
+
     set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 
@@ -341,7 +341,7 @@ class BotClient(commands.Bot):
         pass
 
     async def on_error(self, event_method, *args, **kwargs):
-        exc_type, exception, traceback = sys.exc_info()
+        exc_type, exception, traceback = exc_info()
 
         if exc_type == ExtensionDisabledGuild:  # Can be raised outside a command, e.g. from an event listener
             return
