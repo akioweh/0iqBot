@@ -18,6 +18,13 @@ if TYPE_CHECKING:
 
 # noinspection SpellCheckingInspection
 class TwentyFour(Cog):
+    """
+    The 24 number game thing.
+
+    A question composes of four whole numbers
+    The goal is to apply arithmetic operations between the four numbers to get an expression that equals 24.
+    """
+
     def __init__(self, bot: 'BotClient'):
         self.bot = bot
         self.parser = MathParser(allowed_operations={add, mul, sub, truediv})
@@ -28,11 +35,10 @@ class TwentyFour(Cog):
         The 24 number game thing.
 
         A question composes of four whole numbers
-        The goal is to apply arithmetic operations between the four numbers
-        to get an expression that equals 24.
+        The goal is to apply arithmetic operations between the four numbers to get an expression that equals 24.
         """
         if not ctx.invoked_subcommand:
-            await ctx.send_help(TwentyFour)
+            await ctx.send_help(self.twenty_four)
 
     @twenty_four.command(aliases=['q', 'generate'])
     async def new(self, ctx: Context):
@@ -128,7 +134,7 @@ class TwentyFour(Cog):
         return q
 
     # Actual algorithms below
-    OPS: Final = {mul: '*', sub: '-', add: '+',
+    OPS: Final = {mul                                      : '*', sub: '-', add: '+',
                   lambda a, b: a / b if b != 0 else 9999999: '/'}  # special div to avoid division by zero
 
     # Computationally Intensive
