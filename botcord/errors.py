@@ -2,6 +2,8 @@
 
 from discord.ext.commands import CommandInvokeError as _CommandInvokeError
 
+__all__ = ['ExtensionDisabledGuild']
+
 
 class ExtensionDisabledGuild(_CommandInvokeError):
     """Raised when a command/etc. is invoked
