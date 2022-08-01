@@ -15,6 +15,7 @@ from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandO
 from sys import platform as __platform__, stderr, stdout, version_info as __version_info__
 
 from .configs import ConfigDict, load_configs, new_guild_config, save_config, save_guild_config
+from .errors import ExtensionDisabledGuild
 from .functions import *
 from .utils.errors import protect
 from .utils.extensions import get_all_extensions_from
@@ -341,6 +342,8 @@ class BotClient(commands.Bot):
     async def on_command(self, context):
         pass
 
+    # noinspection DuplicatedCode
+    # the "duplicated code" is from the debug version of this function which has extra logging
     async def on_command_error(self, context, exception, *, fire_anyway=False):
         if not fire_anyway:  # Normally we don't do anything here if another handler catches the error
             if hasattr(context.command, 'on_error'):
@@ -351,7 +354,8 @@ class BotClient(commands.Bot):
                 return
 
         handled = False
-        if isinstance(exception, (CommandNotFound, DisabledCommand, CheckFailure)) or (context.command is None):
+        if isinstance(exception, (CommandNotFound, DisabledCommand, CheckFailure,
+                                  ExtensionDisabledGuild)) or (context.command is None):
             handled = True
         if isinstance(exception, NoPrivateMessage):
             await context.reply('This does not work in Direct Messages!', delete_after=10)
