@@ -1,3 +1,7 @@
 flag_threshold: -4
 mute_threshold: -6.5
 unmute_reserve: -0.3
+enabled_guilds:
+    717010362234568764:
+        detail_log_channel: 986976809319006308
+        flagged_log_channel: 986977527736201256

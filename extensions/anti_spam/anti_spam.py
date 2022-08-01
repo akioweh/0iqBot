@@ -13,6 +13,7 @@ from discord import Embed, Forbidden, Member, Message
 from discord.ext.commands import Context, group
 
 from botcord.checks import guild_admin_or_perms
+from botcord.errors import ExtensionDisabledGuild
 from botcord.ext.commands import Cog
 from botcord.utils.errors import protect
 
@@ -135,14 +136,21 @@ class AntiSpam(Cog):
         self._trackers: dict[Member, Tracker] = dict()
         self.config_init(__file__)
 
-        default_config = {'flag_threshold': -5, 'mute_threshold': -6.5, 'unmute_reserve': -0.3}
+        default_config = {'flag_threshold': -5, 'mute_threshold': -6.5, 'unmute_reserve': -0.3,
+                          'enabled_guilds': {}}
         default_config.update(self.config)
         self.config.update(default_config)
+
+    @property
+    def enabled_guids(self):
+        return self.config['enabled_guilds'].keys()
 
     @Cog.listener(name='on_message_all')
     async def _process_message(self, msg: Message):
         if msg.author.bot or not msg.guild:
             return
+        if msg.guild.id not in self.enabled_guids:
+            raise ExtensionDisabledGuild(f'AntiSpam is disabled for guild {msg.guild.name}; {msg.guild.id}.')
 
         if msg.author not in self._trackers:
             self._trackers[msg.author] = Tracker(msg.author)
@@ -183,9 +191,12 @@ class AntiSpam(Cog):
             rep_mlt, score)
 
     async def _detail_log(self, msg: Message, data: tuple) -> str:
-        chl = self.bot.get_channel(986976809319006308)
+        chl_id = self.config[msg.guild.id]['detail_log_channel']
+        if not chl_id:
+            return 'detailed logging not enabled'
+        chl = self.bot.get_channel(chl_id)
         if not chl:
-            raise ValueError('didnt find detail-log channel for antispam')
+            raise ValueError(f'didnt find detail-log channel for antispam for guild {msg.guild.name}; {msg.guild.id}')
 
         score, data = data
 
@@ -212,9 +223,12 @@ class AntiSpam(Cog):
         return (await chl.send(embed=Embed.from_dict(embed_data))).jump_url
 
     async def _flagged_log(self, msg: Message, log_url: str):
-        chl = self.bot.get_channel(986977527736201256)
+        chl_id = self.config[msg.guild.id]['flagged_log_channel']
+        if not chl_id:
+            return
+        chl = self.bot.get_channel(chl_id)
         if not chl:
-            raise ValueError('didnt find flag-log channel for antispam')
+            raise ValueError(f'didnt find flag-log channel for antispam for guild {msg.guild.name} {msg.guild.id}')
 
         embed_data = {
             "type"       : "rich",
@@ -267,7 +281,8 @@ class AntiSpam(Cog):
     @group(name='anti_spam', aliases=['antispam', 'as'])
     @guild_admin_or_perms(manage_roles=True)
     async def _anti_spam(self, ctx: Context):
-        pass
+        if ctx.guild.id not in self.enabled_guids:
+            raise ExtensionDisabledGuild(f'AntiSpam is disabled for guild {ctx.guild.name}; {ctx.guild.id}.')
 
     @_anti_spam.command(name='set_score', aliases=['setscore', 'set'])
     @guild_admin_or_perms(manage_roles=True)
