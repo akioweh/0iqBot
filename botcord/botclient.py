@@ -7,6 +7,7 @@ from signal import SIGINT, SIG_IGN, signal
 from traceback import print_exception
 from typing import Callable, Final, Optional, ParamSpec, TypeVar
 
+import sys
 from aiohttp import ClientSession
 from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, Status
 from discord.ext import commands
@@ -338,6 +339,15 @@ class BotClient(commands.Bot):
 
     async def on_relationship_update(self, before, after):
         pass
+
+    async def on_error(self, event_method, *args, **kwargs):
+        exc_type, exception, traceback = sys.exc_info()
+
+        if exc_type == ExtensionDisabledGuild:  # Can be raised outside a command, e.g. from an event listener
+            return
+
+        print(f'Ignoring exception in event {event_method}:', file=stderr)
+        print_exception(exc_type, exception, traceback)
 
     async def on_command(self, context):
         pass
