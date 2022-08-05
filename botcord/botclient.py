@@ -1,3 +1,4 @@
+from asyncio import gather
 from collections.abc import Coroutine
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
@@ -84,6 +85,8 @@ class BotClient(commands.Bot):
             # noinspection PyProtectedMember
             from .utils._debug import on_command_error as debug_on_command_error
             self.on_command_error = debug_on_command_error
+
+        log('Synchronous Initialization Finished')
 
     async def __init_async__(self) -> bool:
         """Used to initialize whatever that requires to run inside an event loop
@@ -395,7 +398,14 @@ class BotClient(commands.Bot):
         pass
 
     async def validate_guild_configs(self):
-        for guild in self.guilds:
+        # concurrently gather invites for speedups with multiple guilds
+        guilds = self.guilds
+        tasks = []
+        for guild in guilds:
+            tasks.append(guild.invites())
+        guild_invites = await gather(*tasks)
+
+        for guild, invites in zip(guilds, guild_invites):
             # Create config for guild if it doesn't exist
             if guild.id not in self.guild_configs:
                 self.guild_configs[guild.id] = self.create_guild_config(guild)
@@ -403,7 +413,7 @@ class BotClient(commands.Bot):
             # Update guild name and invite
             self.guild_configs[guild.id]['guild']['name'] = guild.name
             try:
-                i0: list[Optional[Invite]] = await guild.invites()
+                i0: list[Optional[Invite]] = invites
             except Forbidden:
                 i0 = []
             if i0:
