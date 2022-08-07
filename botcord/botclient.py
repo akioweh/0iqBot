@@ -409,6 +409,11 @@ class BotClient(commands.Bot):
     async def load_commands(self):
         pass
 
+    async def does_trigger_command(self, message: Message) -> bool:
+        """checks if the message starts with a valid prefix
+        that would trigger the bot as a command"""
+        return any(message.content.startswith(i) for i in await self.command_prefix(self, message))
+
     async def validate_guild_configs(self):
         # concurrently gather invites for speedups with multiple guilds
         guilds = self.guilds
