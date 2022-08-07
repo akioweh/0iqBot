@@ -1,32 +1,48 @@
 import traceback
+from typing import ContextManager, Type
 
 import sys
 
 
-class protect:
+class protect(ContextManager):
     """
-    Context Manager used to suppress errors and print traceback to stderr
-    without halting program.
-    Protects whatever that is within the context.
+    Context Manager used to suppress errors and print traceback/error message
+    to stderr without propagating the errors (and halting the program).
+    "Protects" whatever code that must execute after the context
+
+    Similar to ``contextlib.suppress``, but prints information to stderr
 
     Example::
 
         with protect():
-            // protected code
+            # error prone code
+
+        # protected code (always executes)
 
     """
-    def __init__(self, compact=False):
+    def __init__(self, *exceptions: Type[BaseException], compact: bool = False):
+        """initializer with options
+
+        :param exceptions: Variable number of exceptions to catch and protect from.
+            If not specified, all exceptions are caught and protected
+        :param compact: If true, only prints the exception message (if it has one), otherwise prints a full traceback
+        """
+        self.exceptions = exceptions
         self.compact = compact
 
     def __enter__(self):
         pass
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if any((exc_type, exc_val, exc_tb)):
+    def __exit__(self, exc_type: type, exc_val: str, exc_tb: str):
+        if exc_type is not None:
+            # do not protect is exceptions argument is specified and this exception is not in it
+            if self.exceptions and not issubclass(exc_type, self.exceptions):
+                return False
+            # protect from this error, and print traceback/error message
             if self.compact:
                 print(exc_val, file=sys.stderr)
             else:
-                print(f'Exception ingored and resuming execution of the remaining program:', file=sys.stderr)
+                print(f'Exception ignored and resuming execution of the remaining program:', file=sys.stderr)
                 traceback.print_exc()
         return True
 
