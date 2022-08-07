@@ -1,3 +1,2 @@
+from .checks import *
 from .cog import Cog
-
-__all__ = ['Cog']

@@ -12,9 +12,8 @@ import time
 from discord import Embed, Forbidden, Member, Message
 from discord.ext.commands import Context, group
 
-from botcord.checks import guild_admin_or_perms
 from botcord.errors import ExtensionDisabledGuild
-from botcord.ext.commands import Cog
+from botcord.ext.commands import Cog, guild_admin_or_perms
 from botcord.utils.errors import protect
 
 if TYPE_CHECKING:

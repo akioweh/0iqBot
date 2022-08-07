@@ -6,8 +6,7 @@ from typing import List, Optional, TYPE_CHECKING
 from discord import Message, Reaction, TextChannel, User
 from discord.ext.commands import Context, check_any, command
 
-from botcord.checks import guild_owner_or_perms, has_global_perms
-from botcord.ext.commands import Cog
+from botcord.ext.commands import Cog, guild_owner_or_perms, has_global_perms
 from botcord.functions import batch
 
 if TYPE_CHECKING:
