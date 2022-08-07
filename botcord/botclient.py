@@ -1,4 +1,4 @@
-from asyncio import gather
+from asyncio import gather, iscoroutinefunction
 from collections.abc import Coroutine
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
@@ -13,7 +13,7 @@ from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, 
 from discord.ext import commands
 from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandOnCooldown, DisabledCommand,
                                          NoPrivateMessage, UserInputError)
-from sys import exc_info, platform as __platform__, stderr, stdout, version_info as __version_info__
+from sys import exc_info, platform as __platform__, stderr, stdout
 
 from .configs import ConfigDict, load_configs, new_guild_config, save_config, save_guild_config
 from .errors import ExtensionDisabledGuild
@@ -22,9 +22,8 @@ from .utils.errors import protect
 from .utils.extensions import get_all_extensions_from
 
 # Fix to stop aiohttp spamming errors in stderr when closing because that is uglier
-if __version_info__[0] == 3 and __version_info__[1] >= 8 and __platform__.startswith('win'):
+if __platform__.startswith('win'):
     from asyncio import WindowsSelectorEventLoopPolicy, set_event_loop_policy
-
     set_event_loop_policy(WindowsSelectorEventLoopPolicy())
 
 
@@ -95,6 +94,19 @@ class BotClient(commands.Bot):
             return False
         self.async_init_ed = True
         self.aiohttp_session = ClientSession(loop=self.loop)
+
+        # call async initializers for any cogs that have them
+        tasks = []
+        for cog in self.cogs.values():
+            if not hasattr(cog, '__init_async__'):
+                continue
+            if not iscoroutinefunction(cog.__init_async__):
+                log(f'__init_async__ methods should be coroutine functions, '
+                    f'but is {type(cog.__init_async__)} for cog {cog.__class__.__name__}', tag='Warn', file=stderr)
+                continue
+            tasks.append(cog.__init_async__())
+
+        await gather(*tasks)
 
         log('Asynchronous Initialization Finished')
         return True
