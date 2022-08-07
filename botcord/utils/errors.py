@@ -20,6 +20,7 @@ class protect(ContextManager):
         # protected code (always executes)
 
     """
+
     def __init__(self, *exceptions: Type[BaseException], compact: bool = False):
         """initializer with options
 
@@ -33,7 +34,8 @@ class protect(ContextManager):
     def __enter__(self):
         pass
 
-    def __exit__(self, exc_type: type, exc_val: str, exc_tb: str):
+    def __exit__(self, exc_type: type | None, exc_val: BaseException | None,
+                 exc_tb: Type[traceback.TracebackException] | None) -> bool:
         if exc_type is not None:
             # do not protect is exceptions argument is specified and this exception is not in it
             if self.exceptions and not issubclass(exc_type, self.exceptions):
