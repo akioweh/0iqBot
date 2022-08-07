@@ -80,7 +80,7 @@ class TwentyFour(Cog):
             if answer_msg.author != ctx.author:
                 await answer_msg.reply('You can\'t answer other people\'s questions!')
             else:  # valid reply (from OP), check the answer
-                if self.bot.does_trigger_command(answer_msg):
+                if await self.bot.does_trigger_command(answer_msg):
                     continue  # ignore commands
 
                 correct, response = self.check_answer(answer_msg.content, question)
