@@ -5,6 +5,8 @@ from typing import Any, Iterable, Optional
 from discord import Message
 from sys import __stdout__
 
+from .types import SupportsWrite
+
 
 def removeprefix(string: str, prefix: str | Iterable[str]) -> str:
     """Similar to ``str.removeprefix()`` in python 3.9,
@@ -33,18 +35,20 @@ def time_str() -> str:
     return datetime.now().strftime('%H:%M:%S')
 
 
-def log(message: str, tag: str = 'Main', end: str = '\n', time: bool = True):
+def log(message: str, tag: str = 'Main', end: str = '\n', time: bool = True, *, file: SupportsWrite = __stdout__):
     """Logs messages to stdout.
     ``[timestamp] [tag] message (ending)``
 
     :param str message: message to log
     :param str tag: tag, defaults to "Main"
     :param str end: string to append to the end of the output, defaults to newline (\n)
-    :param bool time: whether to output a timestamp"""
-    __stdout__.write((f'[{time_str()}] ' if time else '') +
-                     (f'[{tag}]: ' if tag else '') +
-                     f'{message}{end}')
-    __stdout__.flush()
+    :param bool time: whether to output a timestamp
+    :param file: file-like object to write to, defaults to stdout"""
+    file.write((f'[{time_str()}] ' if time else '') +
+               (f'[{tag}]: ' if tag else '') +
+               f'{message}{end}')
+    if hasattr(file, 'flush'):
+        file.flush()
 
 
 def to_int(obj: Any, *args, **kwargs) -> Optional[int]:
