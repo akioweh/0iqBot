@@ -8,5 +8,4 @@ guild:
 bot:
     prefix: ~
 
-ext:
-    - ~
+ext: {}
