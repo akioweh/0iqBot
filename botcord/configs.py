@@ -1,9 +1,10 @@
 import os
-from typing import Optional, TypeAlias
+from typing import Optional
 
 import ruamel.yaml
 
 from .functions import log
+from .types import ConfigDict
 
 DEFAULT_GLOBAL_CONFIG_PATH: str = os.path.dirname(os.path.realpath(__file__)) + '/default_global_configs.yml'
 DEFAULT_GUILD_CONFIG_PATH: str = os.path.dirname(os.path.realpath(__file__)) + '/default_guild_configs.yml'
@@ -11,11 +12,11 @@ DEFAULT_GUILD_CONFIG_PATH: str = os.path.dirname(os.path.realpath(__file__)) + '
 YAML = ruamel.yaml.YAML()
 YAML.indent(mapping=4, sequence=4, offset=2)
 
-ConfigDict: TypeAlias = dict[str, str | int | list | dict]
-
 
 def recursive_update(base: dict, extra: dict) -> None:
-    """updates base IN PLACE"""
+    """Recursively updates dictionary with extra data.
+
+    **updates base IN PLACE**"""
     for k, v in extra.items():
         if k in base and isinstance(base[k], dict) and isinstance(extra[k], dict):
             recursive_update(base[k], extra[k])
@@ -23,8 +24,11 @@ def recursive_update(base: dict, extra: dict) -> None:
             base[k] = extra[k]
 
 
-def load_configs(*, global_path: str = 'global_configs.yml', guild_dir: str = 'configs/') -> \
-        [ConfigDict, dict[int, ConfigDict]]:
+def load_configs(*, global_path: str = 'global_configs.yml',
+                 guild_dir: str = 'configs/') -> [ConfigDict, dict[int, ConfigDict]]:
+    """Loads global config AND guild configs from file.
+
+    :return: configs in the format of: tuple(global_config, {guild_id: guild_config})"""
     # Global Configuration File
     global_config_path = os.getcwd() + '/' + global_path
     try:
@@ -61,8 +65,13 @@ def load_configs(*, global_path: str = 'global_configs.yml', guild_dir: str = 'c
     return global_configs, guild_configs
 
 
-def new_guild_config(guild_id: int, initial_config: Optional[ConfigDict] = None, *, guild_dir: str = 'configs/') -> \
-        ConfigDict:
+def new_guild_config(guild_id: int,
+                     initial_config: Optional[ConfigDict] = None, *,
+                     guild_dir: str = 'configs/') -> ConfigDict:
+    """Creates a new guild config file with optional initial data
+    and saves to file.
+
+    :return: the new config dictionary"""
     guild_configs_dir = os.getcwd() + '/' + guild_dir
     config = default_guild()
     recursive_update(config, {'guild': {'id': guild_id}})
@@ -77,18 +86,21 @@ def new_guild_config(guild_id: int, initial_config: Optional[ConfigDict] = None,
 
 
 def save_config(config: ConfigDict, *, global_path: str = 'global_configs.yml'):
+    """Saves config to file."""
     global_config_path = os.getcwd() + '/' + global_path
     with open(global_config_path, mode='w', encoding='UTF-8') as file:
         YAML.dump(config, file)
 
 
 def save_guild_config(config: ConfigDict, guild_id: int, *, guild_dir: str = 'configs/'):
+    """Saves guild config to file."""
     guild_configs_dir = os.getcwd() + '/' + guild_dir
     with open(f'{guild_configs_dir}{guild_id}.yml', mode='w', encoding='UTF-8') as file:
         YAML.dump(config, file)
 
 
 def default_global() -> ConfigDict:
+    """Returns defailt Global Config"""
     try:
         with open(DEFAULT_GLOBAL_CONFIG_PATH, encoding='UTF-8') as file:
             return YAML.load(file)
@@ -97,6 +109,7 @@ def default_global() -> ConfigDict:
 
 
 def default_guild() -> ConfigDict:
+    """Returns default Guild Config"""
     try:
         with open(DEFAULT_GUILD_CONFIG_PATH, encoding='UTF-8') as file:
             return YAML.load(file)
