@@ -55,7 +55,7 @@ class MessageHook(Cog):
             delete = asyncio.create_task(ctx.message.delete())
 
         try:
-            await MessageHook.send(ctx.channel, text, user.name, user.avatar_url, attachments)
+            await MessageHook.send(ctx.channel, text, user.name, user.avatar_url, attachments, self.mentions)
         except Forbidden:
             with suppress(Forbidden):
                 await ctx.reply('Missing Permissions', delete_after=5)
@@ -95,7 +95,7 @@ class MessageHook(Cog):
                    username: str,
                    avatar_url: str,
                    attachments: Sequence = None,
-                   allowed_mentions: AllowedMentions = None):
+                   allowed_mentions: AllowedMentions = AllowedMentions.none()):
         """Sends a message to a channel with a webhook."""
         hooks: Optional[list[Webhook]] = await chl.webhooks()
         valid_hook: Optional[Webhook] = None
