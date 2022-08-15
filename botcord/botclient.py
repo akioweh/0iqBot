@@ -4,7 +4,7 @@ from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module
 from os import getcwd, getenv
-from signal import SIGBREAK, SIGINT, SIGTERM, SIG_IGN, signal
+from signal import SIGINT, SIGTERM, SIG_IGN, signal
 from sys import exc_info, platform as __platform__, stderr as __stderr__, stdout as __stdout__
 from traceback import print_exception
 from types import ModuleType
@@ -35,6 +35,8 @@ if __platform__.startswith('win'):
 def _subprocess_initializer():
     signal(SIGINT, SIG_IGN)
     if __platform__.startswith('win'):
+        from signal import SIGBREAK
+
         signal(SIGBREAK, SIG_IGN)
 
 
