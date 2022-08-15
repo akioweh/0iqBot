@@ -2,17 +2,19 @@ import asyncio
 from datetime import datetime
 from typing import Optional, Union
 
-from discord import Message, PartialEmoji, Role, TextChannel, User
+from discord import Member, Message, PartialEmoji, Role, TextChannel, User
 from discord.ext.commands import Cog, Context, group
 from discord.ext.commands.converter import Greedy, UserConverter
 from discord.ext.commands.errors import UserNotFound
 
-from botcord.utils import find
+from botcord.utils import find, str_info
 
 
 class AdvInfo(Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    # ========== Escape Discord Utility ========== #
 
     @group(aliases=['esc', 'str'], invoke_without_command=True)
     async def escape(self, ctx: Context, args: Greedy[Union[PartialEmoji, User, Role, TextChannel]] = None):
@@ -68,6 +70,8 @@ class AdvInfo(Cog):
         else:
             await ctx.reply('Role not found (Only works with roles in THIS server).', delete_after=10)
 
+    # ========== Bot Status Info ========== #
+
     @group(invoke_without_command=True)
     async def status(self, ctx: Context):
         await ctx.reply('TODO: show bot\'s status and various metrics')
@@ -94,6 +98,19 @@ class AdvInfo(Cog):
                        f'True Ping (bot-based): `{delta1}`ms \n'
                        f'True Ping (message-based): `{delta2}`ms')
         await p_t
+
+    # ========== Discord Object Info ========== #
+
+    @group(invoke_without_command=True)
+    async def info(self, ctx: Context, obj: Optional[Member] = None):
+        if not obj:
+            await ctx.reply('This object type isn\'t supported yet... or try using a specific subcommand.')
+        else:
+            await ctx.reply(str_info.member_details(obj))
+
+    @info.command()
+    async def member(self, ctx: Context, member: Member):
+        await ctx.reply(str_info.member_details(member))
 
 
 def setup(bot):
