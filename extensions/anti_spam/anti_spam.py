@@ -165,14 +165,17 @@ class AntiSpam(Cog):
         msg_ascii = msg.content.encode('ascii', 'ignore').decode()
         non_asciis = len(msg.content) - len(msg_ascii)
         disc_objs = len(re.findall(r'<(:\w+:|@|#|@&)\d{18}>', msg.content))
+        unique_mentions = set(msg.mentions)
+        unique_mentions = list(filter(lambda x: x.id != msg.author.id and not x.bot, unique_mentions))
+        unique_mentions += list(set(msg.role_mentions))
 
         msg_len = len(msg.content)
-        msg_men = len(msg.mentions) + len(msg.role_mentions)
+        msg_men = len(unique_mentions)
         msg_att = len(msg.attachments)
         msg_chr = non_asciis + disc_objs
 
         if msg.reference and msg.reference.cached_message and msg.reference.cached_message.author in msg.mentions:
-            msg_men -= 1
+            msg_men -= 1  # negate two ping-counts when someone is reply-mentioned and explicitly mentioned
 
         scr_len = AntiSpam.sigmoidy(msg_len, X['Msg_Len_Scl'], X['Msg_Len_Mlt'])  # Message Text Length
         scr_men = AntiSpam.paraboly(msg_men, X['Msg_Men_Scl'], X['Msg_Men_Mlt'])  # Message User/Role Mentions
@@ -191,7 +194,7 @@ class AntiSpam(Cog):
             rep_mlt, score)
 
     async def _detail_log(self, msg: Message, data: tuple) -> str:
-        chl_id = self.config[msg.guild.id]['detail_log_channel']
+        chl_id = self.config['enabled_guilds'][msg.guild.id]['detail_log_channel']
         if not chl_id:
             return 'detailed logging not enabled'
         chl = self.bot.get_channel(chl_id)
@@ -223,7 +226,7 @@ class AntiSpam(Cog):
         return (await chl.send(embed=Embed.from_dict(embed_data))).jump_url
 
     async def _flagged_log(self, msg: Message, log_url: str):
-        chl_id = self.config[msg.guild.id]['flagged_log_channel']
+        chl_id = self.config['enabled_guilds'][msg.guild.id]['flagged_log_channel']
         if not chl_id:
             return
         chl = self.bot.get_channel(chl_id)
@@ -233,7 +236,7 @@ class AntiSpam(Cog):
         embed_data = {
             "type"       : "rich",
             "title"      : f"AntiSpam Flagged {msg.author.name}",
-            "description": log_url,
+            "description": f"Detailed log at: {log_url}",
             "color"      : 16711680
         }
 
