@@ -1,11 +1,14 @@
+"""All kinds of highly generic simple utility functions"""
+
+from collections.abc import Generator
 from datetime import datetime
 from re import IGNORECASE, findall as _re_findall
-from typing import Any, Iterable, Optional
+from sys import stdout as __stdout__
+from typing import Any, AnyStr, Iterable, Optional
 
 from discord import Message
-from sys import __stdout__
 
-from .types import SupportsWrite
+from .types import FileDescripor, SupportsWrite
 
 
 def removeprefix(string: str, prefix: str | Iterable[str]) -> str:
@@ -35,15 +38,20 @@ def time_str() -> str:
     return datetime.now().strftime('%H:%M:%S')
 
 
-def log(message: str, tag: str = 'Main', end: str = '\n', time: bool = True, *, file: SupportsWrite = __stdout__):
-    """Logs messages to stdout.
+def log(message: str, /, tag: str = 'Main', end: str = '\n', time: bool = True, *,
+        file: SupportsWrite = __stdout__):
+    """Logs messages to file (stdout by default).
+
+    Format:
     ``[timestamp] [tag] message (ending)``
 
-    :param str message: message to log
-    :param str tag: tag, defaults to "Main"
+    :param str message: Message to write to file
+    :param str tag: Tag to prefixed at the front of the message (while enclosed in "[]").
+        Pass an empty string to disable.
     :param str end: string to append to the end of the output, defaults to newline (\n)
-    :param bool time: whether to output a timestamp
-    :param file: file-like object to write to, defaults to stdout"""
+    :param bool time: Whether to prepend a local timestamp
+    :param file: File-like object to write to, defaults to stdout
+    """
     file.write((f'[{time_str()}] ' if time else '') +
                (f'[{tag}]: ' if tag else '') +
                f'{message}{end}')
@@ -56,7 +64,7 @@ def to_int(obj: Any, *args, **kwargs) -> Optional[int]:
     returns None if conversion fails"""
     try:
         return int(obj, *args, **kwargs)
-    except ValueError:
+    except (ValueError, TypeError):
         return None
 
 
@@ -65,7 +73,7 @@ def to_flt(obj: Any) -> Optional[float]:
     returns None if conversion fails"""
     try:
         return float(obj)
-    except ValueError:
+    except (ValueError, TypeError):
         return None
 
 
@@ -75,20 +83,20 @@ def clean_return(string: str) -> str:
     return str(string).replace('\r\n', '\n').replace('\r', '\n').replace(' \n', '\n').strip()
 
 
-def load_list(filepath):
+def load_list(filepath: FileDescripor) -> list[str]:
     """loads a list of strings from a text file, items delimited by newlines"""
     with open(filepath, mode='r', encoding='utf-8') as file:
         return file.read().splitlines()
 
 
-def save_list(filepath, array):
+def save_list(filepath: FileDescripor, array: Iterable[AnyStr]):
     """saves a list of items as strings to a text file, delimited by newlines"""
     with open(filepath, mode='w', encoding='utf-8') as file:
         for item in array:
-            file.write(clean_return(item).replace("\n", "\\n") + "\n")
+            file.write(clean_return(item).replace('\n', r'\n') + '\n')
 
 
-def batch(msg: str, d: str = '\n', length: int = 2000, *, d2: str = ' '):
+def batch(msg: str, d: str = '\n', length: int = 2000, *, d2: str = ' ') -> Generator[str, None, None]:
     """
     "batches" a long string semi-intelligently into chunks no more than 2000 characters long \n
     useful to split a long essay into messages short enough to be sent over discord
@@ -101,7 +109,7 @@ def batch(msg: str, d: str = '\n', length: int = 2000, *, d2: str = ' '):
     :param str d: preferred separating character
     :param str d2: (keyword-only) secondary/backup separating character
     :param int length: maximum length of chunks, 2000 for standard discord, 4000 for discord nitro
-    :return: a list of strings under the length limit
+    :return: (yields) a list of strings each under the length limit
     """
     splitted = [e + d for e in msg.split(d)]
     if splitted[-1] == d:
@@ -128,7 +136,8 @@ def batch(msg: str, d: str = '\n', length: int = 2000, *, d2: str = ' '):
         yield cache
 
 
-def _contain_arg_helper(arg: Message | str, check: Iterable[str] | str, match_case: bool = False) -> [str, Iterable[str]]:
+def _contain_arg_helper(arg: Message | str, check: Iterable[str] | str, match_case: bool = False) -> [str,
+                                                                                                      Iterable[str]]:
     items: Iterable[str] = [check] if isinstance(check, str) else check
     if isinstance(arg, Message):
         string = arg.content
@@ -193,5 +202,16 @@ def contain_word(msg: Message | str, check: Iterable[str] | str, match_case: boo
     return any(_re_findall(rf'\b{i}\b', string, 0 if match_case else IGNORECASE) for i in items)
 
 
+def recursive_update(base: dict, extra: dict) -> None:
+    """Recursively updates dictionary with extra data.
+
+    **updates base IN PLACE**"""
+    for k, v in extra.items():
+        if k in base and isinstance(base[k], dict) and isinstance(extra[k], dict):
+            recursive_update(base[k], extra[k])
+        else:
+            base[k] = extra[k]
+
+
 __all__ = ['removesuffix', 'removeprefix', 'time_str', 'log', 'to_int', 'to_flt', 'clean_return', 'load_list',
-           'save_list', 'batch', 'contain_any', 'contain_all', 'contain_word']
+           'save_list', 'batch', 'contain_any', 'contain_all', 'contain_word', 'recursive_update']

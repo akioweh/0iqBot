@@ -5,10 +5,10 @@ AntiSpam V1
 
 import asyncio
 import re
-from contextlib import suppress
-from typing import Final, Optional, TYPE_CHECKING
-
 import time
+from contextlib import suppress
+from typing import Final, Iterable, Optional, TYPE_CHECKING
+
 from discord import Embed, Forbidden, Member, Message
 from discord.ext.commands import Context, group
 
@@ -141,7 +141,7 @@ class AntiSpam(Cog):
         self.config.update(default_config)
 
     @property
-    def enabled_guids(self):
+    def enabled_guids(self) -> Iterable[int]:
         return self.config['enabled_guilds'].keys()
 
     @Cog.listener(name='on_message_all')
@@ -149,7 +149,8 @@ class AntiSpam(Cog):
         if msg.author.bot or not msg.guild:
             return
         if msg.guild.id not in self.enabled_guids:
-            raise ExtensionDisabledGuild(f'AntiSpam is disabled for guild {msg.guild.name}; {msg.guild.id}.')
+            raise ExtensionDisabledGuild(f'AntiSpam is disabled for guild {msg.guild.name} ({msg.guild.id}).',
+                                         name=type(self).__name__)
 
         if msg.author not in self._trackers:
             self._trackers[msg.author] = Tracker(msg.author)
@@ -195,7 +196,7 @@ class AntiSpam(Cog):
             return 'detailed logging not enabled'
         chl = self.bot.get_channel(chl_id)
         if not chl:
-            raise ValueError(f'didnt find detail-log channel for antispam for guild {msg.guild.name}; {msg.guild.id}')
+            raise ValueError(f'didnt find detail-log channel for antispam for guild {msg.guild.name} ({msg.guild.id})')
 
         score, data = data
 
@@ -227,7 +228,7 @@ class AntiSpam(Cog):
             return
         chl = self.bot.get_channel(chl_id)
         if not chl:
-            raise ValueError(f'didnt find flag-log channel for antispam for guild {msg.guild.name} {msg.guild.id}')
+            raise ValueError(f'didnt find flag-log channel for antispam for guild {msg.guild.name} ({msg.guild.id})')
 
         embed_data = {
             "type"       : "rich",
@@ -281,7 +282,8 @@ class AntiSpam(Cog):
     @guild_admin_or_perms(manage_roles=True)
     async def _anti_spam(self, ctx: Context):
         if ctx.guild.id not in self.enabled_guids:
-            raise ExtensionDisabledGuild(f'AntiSpam is disabled for guild {ctx.guild.name}; {ctx.guild.id}.')
+            raise ExtensionDisabledGuild(f'AntiSpam is disabled for guild {ctx.guild.name} ({ctx.guild.id}).',
+                                         name=type(self).__name__)
 
     @_anti_spam.command(name='set_score', aliases=['setscore', 'set'])
     @guild_admin_or_perms(manage_roles=True)

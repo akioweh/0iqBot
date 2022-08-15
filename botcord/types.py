@@ -1,8 +1,9 @@
 """Typing Definitions for BotCord."""
 
+from os import PathLike
 from typing import ParamSpec, Protocol, TypeAlias, TypeVar
 
-__all__ = ['SupportsWrite', 'ConfigDict', 'BasicTypes', 'BasicValues', 'Param', 'T']
+__all__ = ['BasicValues', 'BasicTypes', 'ConfigDict', 'Param', 'T', 'StrOrPath', 'FileDescripor', 'SupportsWrite']
 
 # Poggers recursive type annotations lmao
 BasicValues: TypeAlias = str | int | float | bool | None
@@ -13,7 +14,10 @@ ConfigDict: TypeAlias = dict[str | int, 'BasicTypes | ConfigDict']
 Param: ParamSpec = ParamSpec('Param')  # need to explicitly annotate as ParamSpec or type checker complains...
 T: 'T' = TypeVar('T')
 
+StrOrPath: TypeAlias = str | bytes | PathLike[str] | PathLike[bytes]
+FileDescripor: TypeAlias = StrOrPath | int
 
-class SupportsWrite(Protocol):
+
+class SupportsWrite(Protocol):  # couldn't find this in any builtin definitions
     def write(self, s: str, *args, **kwargs):
         ...

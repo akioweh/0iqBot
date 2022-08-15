@@ -2,7 +2,7 @@ from os.path import abspath as _abspath, dirname as _dirname
 
 from discord.ext.commands import Cog as _bruh_do_not_import_this_Cog
 
-from botcord.configs import YAML as _YAML, recursive_update as _recursive_update
+from botcord.configs import YAML_rw as _YAML, recursive_update as _recursive_update
 
 
 # noinspection PyAttributeOutsideInit

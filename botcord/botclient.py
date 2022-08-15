@@ -1,21 +1,22 @@
-from asyncio import gather, iscoroutinefunction
+from asyncio import CancelledError, Task, TimeoutError, all_tasks, gather, iscoroutinefunction, wait_for
 from collections.abc import Coroutine
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module
 from os import getcwd, getenv
-from signal import SIGBREAK, SIGINT, SIG_IGN, signal
+from signal import SIGBREAK, SIGINT, SIGTERM, SIG_IGN, signal
 from sys import exc_info, platform as __platform__, stderr as __stderr__, stdout as __stdout__
 from traceback import print_exception
+from types import ModuleType
 from typing import Callable, Final, Optional
 
 from aiohttp import ClientSession
-from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, Status
+from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, NotFound, Status, TextChannel
 from discord.ext import commands
 from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandOnCooldown, DisabledCommand,
                                          NoPrivateMessage, UserInputError)
 
-from .configs import ConfigDict, load_configs, new_guild_config, save_config, save_guild_config
+from .configs import ConfigDict, default_guild, load_configs, new_guild_config, save_config, save_guild_config
 from .errors import ExtensionDisabledGuild
 from .functions import *
 from .types import Param, SupportsWrite, T
@@ -38,8 +39,8 @@ def _subprocess_initializer():
 
 
 class BotClient(commands.Bot):
-    connect_init_ed: bool
-    async_init_ed: bool
+    _connect_init_ed: bool
+    _async_init_ed: bool
     latest_message: Optional[Message]
     aiohttp_session: Optional[ClientSession]
     process_pool: Optional[ProcessPoolExecutor]
@@ -49,50 +50,57 @@ class BotClient(commands.Bot):
     guild_prefixes: dict[int, str]
 
     def __init__(self, **options):
-        self.DEBUG: Final = True if getenv('DEBUG', 'false').lower() != 'false' else False
-        self.async_init_ed = False
-        self.connect_init_ed = False
+        # Flags
+        self.DEBUG: Final = getenv('DEBUG', 'false').lower() == 'true'
+        self._async_init_ed = False
+        self._connect_init_ed = False
 
-        global_configs, guild_configs = load_configs()
-        prefix_check = BotClient.mentioned_or_in_prefix \
-            if global_configs['bot']['reply_to_mentions'] else BotClient.in_prefix
+        # Configuration stuff
+        self.configs, self.guild_configs = load_configs()
+        self.prefix = self.configs['bot']['prefix']
+        self.guild_prefixes = {c['guild']['id']: c['bot']['prefix'] for c in self.guild_configs.values()}
+
+        prefix_check = self.mentioned_or_in_prefix \
+            if self.configs['bot']['reply_to_mentions'] else self.in_prefix
         process_count = options.pop('multiprocessing', 0)
+
+        # Init superclass with bot options
         self.__status = options.pop('status', None)
         self.__activity = options.pop('activity', None)
         super().__init__(**options,
                          activity=Activity(name='...Bot Initializing...', type=0),
                          status=Status('offline'),
                          command_prefix=prefix_check,
-                         max_messages=global_configs['bot']['message_cache'],
+                         max_messages=self.configs['bot']['message_cache'],
                          intents=Intents.all())
 
+        # Additional utility stuff
         self.latest_message = None
         self.aiohttp_session = None
         self.process_pool = None
         if process_count != 0:
             self.process_pool = ProcessPoolExecutor(max_workers=process_count, initializer=_subprocess_initializer)
 
-        self.configs = global_configs
-        self.guild_configs = guild_configs
-        self.prefix = global_configs['bot']['prefix']
-        self.guild_prefixes = {c['guild']['id']: c['bot']['prefix'] for c in self.guild_configs.values()}
-
+        # Extension stuff
         exts = import_module(self.configs['bot']['extension_dir'], getcwd())
         self.load_extensions(exts)
 
+        # Debug stuff
         if self.DEBUG:
             # noinspection PyProtectedMember
             from .utils._debug import on_command_error as debug_on_command_error
             self.on_command_error = debug_on_command_error
 
-        log('Synchronous Initialization Finished')
+        log('Synchronous Initialization Finished', tag='Init')
 
     async def __init_async__(self) -> bool:
-        """Used to initialize whatever that requires to run inside an event loop
-        (called after the event loop has been initialized)"""
-        if self.async_init_ed:
+        """Called after starting asyncio event loop.
+
+        Used to initialize whatever that requires to run inside an event loop"""
+        if self._async_init_ed:
             return False
-        self.async_init_ed = True
+        self._async_init_ed = True
+
         self.aiohttp_session = ClientSession(loop=self.loop)
 
         # call async initializers for any cogs that have them
@@ -108,22 +116,28 @@ class BotClient(commands.Bot):
 
         await gather(*tasks)
 
-        log('Asynchronous Initialization Finished')
+        log('Asynchronous Initialization Finished', tag='Init')
         return True
 
     async def __init_connect__(self) -> bool:
-        """Used to initialized whatever that require a fully established discord connection
-        (called after logged in and connected to Discord)"""
-        if self.connect_init_ed:
-            return False
-        self.connect_init_ed = True
+        """Called after successful connection and login to Discord.
 
+        Used to initialized whatever that require a fully established discord connection.
+
+        (Can be called multiple times)"""
+        if self._connect_init_ed:
+            return False
+        self._connect_init_ed = True
+
+        # Validate guild configs
         with protect():
             await self.validate_guild_configs()
             self.save_guild_configs()
 
+        # Set bot status to configured status (instead of offline during startup)
         await self.change_presence(activity=self.__activity, status=self.__status)
-        log('Post-Connection Initialization Finished')
+
+        log('Post-Connection Initialization Finished', tag='Connection')
         return True
 
     def to_process(self, func: Callable[Param, T], *args) -> Coroutine[None, Param, T]:
@@ -140,8 +154,9 @@ class BotClient(commands.Bot):
                                'option with key "multiprocessing" to initialize a process pool)')
         return self.loop.run_in_executor(self.process_pool, func, *args)
 
-    def load_extensions(self, package):
-        """load all valid extensions from a Python package"""
+    def load_extensions(self, package: ModuleType):
+        """Load all valid extensions within a Python package.
+        Recursively crawls through all subdirectories"""
         extensions = get_all_extensions_from(package)
         for extension in extensions:
             self.load_extension(extension)
@@ -198,19 +213,24 @@ class BotClient(commands.Bot):
     async def mentioned_or_in_prefix(bot, message):
         return commands.when_mentioned_or(*await BotClient.in_prefix(bot, message))(bot, message)
 
-    async def logm(self, message, tag="Main", sep="\n", *, channel=None, file: SupportsWrite = __stdout__):
-        """
-        Logs a message to the console and to discord.
+    async def logm(self, message: str, /, tag: str = 'Main', end: str = '\n', time: bool = True, *,
+                   channel: Optional[TextChannel] = None, file: SupportsWrite = __stdout__):
+        """Logs a message to file and discord channel.
+
+        same as functions.log but copies message to discord
 
         :param message: The message to log.
-        :param tag: The tag (enclosed in []) to apped to the front of the message.
-        :param sep: The separator/ending character appended to the end of the message.
+        :param tag: The tag to prefixed at the front of the message (while enclosed in "[]").
+        :param end: The separator/ending character appended to the end of the message.
+        :param time: Whether to prefix the message with the current time.
         :param channel: The discord channel to log to. If None, logs to channel of last received message.
         :param file: The file to log to. If None, logs to stdout.
         """
-        file.write(f"[{time_str()}] [{tag}]: {message}" + sep)
+        log(message, tag, end, time, file=file)
+        if channel is None and self.latest_message is None:
+            return
         channel = channel or self.latest_message.channel
-        with suppress(Forbidden):
+        with suppress(Forbidden, NotFound):
             await channel.send(message)
 
     async def on_ready(self):
@@ -356,28 +376,49 @@ class BotClient(commands.Bot):
     async def on_relationship_update(self, before, after):
         pass
 
-    async def on_error(self, event_method, *args, **kwargs):
+    async def on_error(self, event_name: str, *args, **kwargs):
+        """Called when an event handler raises an exception.
+
+        This method returns True if the exception was handled
+        and None/False otherwise.
+        (useful for cooperation between subclass methods)
+
+        :param event_name: The name of the event that raised the exception (prefixed with "on_").
+        :param args: The positional arguments (if any) that were passed to the event.
+        :param kwargs: The keyword arguments (if any) that were passed to the event.
+        """
         exc_type, exception, traceback = exc_info()
 
         if exc_type == ExtensionDisabledGuild:  # Can be raised outside a command, e.g. from an event listener
-            return
+            return True
 
-        print(f'Ignoring exception in event {event_method}:', file=__stderr__)
+        print(f'Ignoring exception in event {event_name}:', file=__stderr__)
         print_exception(exc_type, exception, traceback)
 
-    async def on_command(self, context):
+    async def on_command(self, context: commands.Context):
         pass
 
     # noinspection DuplicatedCode
     # the "duplicated code" is from the debug version of this function which has extra logging
-    async def on_command_error(self, context, exception, *, fire_anyway=False):
+    # noinspection PyIncorrectDocstring
+    async def on_command_error(self, context: commands.Context, exception: BaseException, *,
+                               fire_anyway: bool = False):
+        """Check discord.py docs for intended purpose and default behavior.
+
+        This method returns True if the exception was handled
+        and None/False otherwise.
+        (useful for cooperation between subclass methods)
+
+        :param fire_anyway: if False, will do nothing if another error handler should catch the error
+            (a cog- or command- specific handler)
+        """
         if not fire_anyway:  # Normally we don't do anything here if another handler catches the error
             if hasattr(context.command, 'on_error'):
-                return
+                return True
             cog = context.cog
             # hasattr check is to see if the cog error handler has been overridden with a custom method
             if cog and cog.has_error_handler():
-                return
+                return True
 
         handled = False
         if isinstance(exception, (CommandNotFound, DisabledCommand, CheckFailure,
@@ -400,13 +441,15 @@ class BotClient(commands.Bot):
         #  Additional logging for HTTP (networking) errors
         if isinstance(exception, HTTPException):
             log(f'An API Exception has occurred ({exception.code}): {exception.text}', tag='Error')
-            with suppress(Forbidden):
+            with suppress(Forbidden, NotFound):
                 await context.reply(f'An API error occurred while executing the command. '
                                     f'(API Error code: {exception.code})')
 
-        if not handled:
-            print(f'Ignoring exception in command {context.command}:', file=__stderr__)
-            print_exception(type(exception), exception, exception.__traceback__, file=__stderr__)
+        if handled:
+            return True
+
+        print(f'Ignoring exception in command {context.command}:', file=__stderr__)
+        print_exception(type(exception), exception, exception.__traceback__, file=__stderr__)
 
     async def on_command_completion(self, context):
         pass
@@ -421,21 +464,32 @@ class BotClient(commands.Bot):
 
     async def validate_guild_configs(self):
         """"Validates" guild configs by updating any dynamic settings
+        and ensuring proper format and required fields are present
 
         Currently just updates the guild invite in the configs"""
-        # concurrently gather invites for speedups with multiple guilds
         guilds = self.guilds
+
+        # ========== Basic Hard-Format Validation ========== #
+
+        for guild in guilds:
+            # ensure a config exists for each guild
+            if guild.id not in self.guild_configs:
+                self.guild_configs[guild.id] = self.create_guild_config(guild)
+            # ensure the config is properly formatted
+            else:
+                temp_conf = default_guild()
+                recursive_update(temp_conf, self.guild_configs[guild.id])
+                self.guild_configs[guild.id] = temp_conf  # recursive_update() updates the temp_conf in place
+
+        # ========== Update Guild Invite Link ========== #
+
+        # concurrently gather invites for speedups with multiple guilds
         tasks = []
         for guild in guilds:
             tasks.append(guild.invites())
         guild_invites = await gather(*tasks)
 
         for guild, invites in zip(guilds, guild_invites):
-            # Create config for guild if it doesn't exist
-            if guild.id not in self.guild_configs:
-                self.guild_configs[guild.id] = self.create_guild_config(guild)
-
-            # Update guild name and invite
             self.guild_configs[guild.id]['guild']['name'] = guild.name
             try:
                 i0: list[Optional[Invite]] = invites
@@ -455,6 +509,16 @@ class BotClient(commands.Bot):
                                     invite = i5[0]
 
                 self.guild_configs[guild.id]['guild']['invite'] = invite.url
+
+        # ========== Create Config Field for each Extension ========== #
+
+        for guild in guilds:
+            for ext_name in self.extensions.keys():
+                if ext_name not in self.guild_configs[guild.id]['ext']:
+                    self.guild_configs[guild.id]['ext'][ext_name] = {'enabled': False}  # default to disabled
+
+        # saves any changes made to file
+        self.save_guild_configs()
 
     def guild_config(self, guild: Guild | int) -> dict:
         """Returns the guild config for the given guild."""
@@ -485,36 +549,145 @@ class BotClient(commands.Bot):
 
     def save_guild_configs(self):
         """Saves (all) guild configs to file."""
-        for guild, config in self.guild_configs.items():
-            save_guild_config(config, guild)
-
-    def run(self, *args, **kwargs):
-        """Starts and runs the bot.
-
-        Blocks for as long as the bot is running & not fully shut-down."""
-        super().run(*args, *kwargs)
-        self.__close_sync__()
-
-    async def start(self, *args, **kwargs):
-        await self.__init_async__()
-        await super().start(*args, **kwargs)
+        for guild_id, config in self.guild_configs.items():
+            save_guild_config(config, guild_id)
 
     async def close(self):
-        await self.__close_async__()
-        await self.aiohttp_session.close()
+        """Do Not Override"""
+        await self.__close_connect__()
         await super().close()
 
-    async def __close_async__(self):
-        """Called during shutdown before the asyncio loop finishes
-        to clean up async resources."""
+    async def __close_connect__(self):
+        """Called before connection to Discord is closed."""
+        await self.change_presence(status=Status('offline'))
+        log('Closing connection to Discord...', tag='Connection')
 
-    def __close_sync__(self):
-        """Called during shutdown after the asyncio loop finishes
-        to clean up resources."""
+    async def __shutdown_async__(self):
+        """Called before the asyncio event loop halts."""
+        log('Closing aiohttp session...', tag='Shutdown')
+        await self.aiohttp_session.close()
+        log('Aiohttp session closed.', tag='Shutdown')
+
+    def __shutdown_sync__(self):
+        """Called before blocking run() call exits"""
+        log('Saving Configs...', tag='Shutdown')
         save_config(self.configs)
         self.save_guild_configs()
+        log('All Configs saved.', tag='Shutdown')
         if self.process_pool is not None:
-            self.process_pool.shutdown(wait=True)
+            log('Shutting down process pool...', tag='Shutdown')
+            self.process_pool.shutdown(wait=True, cancel_futures=True)
+            log('Process pool shut down.', tag='Shutdown')
+
+    def _cancel_asyncio_tasks(self):
+        """Cancels **ALL** running and scheduled asyncio tasks.
+        Therefore, this method must not be a coroutine
+        as it would recursively cancel itself."""
+        tasks: set[Task]
+        # Get all still-running tasks
+        if not (tasks := {t for t in all_tasks(loop=self.loop) if not t.done()}):
+            return
+        # Try HARD to cancel ALL tasks ASAP
+        log(f'Cancelling {len(tasks)} lingering tasks...', tag='Shutdown')
+        if self.DEBUG:
+            for task in tasks:
+                print(task)
+
+        async def safe_canceller(t: Task):
+            with protect():
+                if t.cancelled():
+                    return None
+                if t.done():
+                    return t.result() or t.exception()
+                t.cancel()
+                return await t
+
+        try:
+            self.loop.run_until_complete(  # coros wrapped in Task to stop DeprecationWarning
+                    wait_for(gather(*[self.loop.create_task(safe_canceller(t)) for t in tasks], return_exceptions=True),
+                             timeout=10)
+            )
+        except TimeoutError:
+            log('Timed out waiting for lingering tasks to cancel (!!!)', tag='Shutdown')
+            pass
+        except CancelledError:
+            log('Got cancelled while waiting on the cancelled to get cancelled...', tag='WTF')
+
+        log('All lingering tasks cancelled.', tag='Shutdown')
+
+    def shut_async_loop(self):
+        """Completely and forcibly stops and closes the asyncio event loop.
+        Catastrophic if called in the middle of an active connection."""
+        with protect():
+            self.loop.run_until_complete(self.__shutdown_async__())
+
+        log('Closing asyncio event loop...', tag='Shutdown')
+        with protect():
+            self._cancel_asyncio_tasks()
+        with protect():
+            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+
+        self.loop.close()
+        log('Asyncio event loop closed.', tag='Shutdown')
+
+    async def start(self, token: str, *, bot: bool = True, reconnect: bool = True):
+        """Do Not Override"""
+        await self.login(token, bot=bot)
+        await self.connect(reconnect=reconnect)
+
+    def run(self, token: str, *, bot: bool = True, reconnect: bool = True):
+        """Starts and runs the bot.
+
+        -> Starts asyncio event loop
+
+        -> establishes connection with Discord and logs in
+
+        -> (When stop signal detected)
+        closes connection with Discord
+
+        -> Shuts down asyncio event loop
+
+        Blocks for as long as the bot is running & not fully shut-down."""
+
+        async def run_loop():  # runs the Discord Connection
+            try:
+                await self.start(token, bot=bot, reconnect=reconnect)
+            except CancelledError:
+                # this is here because the task canceller will try to cancel this too,
+                # but we can stop it gracefully and close the Discord connection
+                log('Ignoring Cancellation and proceeding to close Discord connection.', tag='Runner')
+            except KeyboardInterrupt:
+                log('KeyboardInterrupt detected', tag='Runner')
+            finally:
+                if not self.is_closed():
+                    await self.close()
+                log('Discord Connection Closed.', tag='Runner')
+
+        def close_loop(*_, **__):  # shuts down asyncio event loop
+            self.shut_async_loop()
+
+        with suppress(NotImplementedError):  # unix only
+            self.loop.add_signal_handler(SIGINT, close_loop)
+            self.loop.add_signal_handler(SIGTERM, close_loop)
+
+        # initialize bot stuff
+        with protect():
+            self.loop.run_until_complete(self.__init_async__())
+
+        run_: Task = self.loop.create_task(run_loop())
+
+        try:
+            self.loop.run_until_complete(run_)
+        except (KeyboardInterrupt, EOFError):
+            log('Received signal to terminate bot and event loop.')
+        finally:
+            close_loop()
+
+        with protect():
+            self.__shutdown_sync__()
+
+        if not run_.cancelled():  # this should um... return exceptions (I think?)
+            return run_.result()
 
 
 __all__ = ['BotClient']

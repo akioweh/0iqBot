@@ -6,8 +6,14 @@ from discord.utils import get as _get
 
 from botcord.functions import to_int as _int
 
+__all__ = ['role', 'channel']
 
+
+# noinspection DuplicatedCode
 async def role(string: str, guild: Guild) -> Optional[Role]:
+    """Tries to find a role in the guild.
+
+    Tries to match by ID, then by mention, then by name."""
     string = string.strip()
     if _role := guild.get_role(_int(string)):
         return _role
@@ -21,7 +27,11 @@ async def role(string: str, guild: Guild) -> Optional[Role]:
     return None
 
 
+# noinspection DuplicatedCode
 async def channel(string: str, guild: Guild) -> Optional[GuildChannel]:
+    """Tries to find a channel in the guild.
+
+    Tries to match by ID, then by mention, then by name."""
     string = string.strip()
     if _channel := guild.get_channel(_int(string)):
         return _channel
@@ -33,6 +43,3 @@ async def channel(string: str, guild: Guild) -> Optional[GuildChannel]:
         return _channel
 
     return None
-
-
-__all__ = ['role', 'channel']

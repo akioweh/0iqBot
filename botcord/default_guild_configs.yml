@@ -1,11 +1,11 @@
 # Guild-specific Config file
 
 guild:
-    id: ~
-    invite: ~
-    name: ~
+    id:
+    invite:
+    name:
 
 bot:
-    prefix: ~
+    prefix:
 
 ext: {}

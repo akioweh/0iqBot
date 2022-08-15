@@ -15,3 +15,27 @@ ext:
     reactomatic:
     welcomer:
         welcome_channel: 839457899360157709
+    extensions.adv_replies.adv_info:
+        enabled: false
+    extensions.adv_replies.mojira_embed:
+        enabled: false
+    extensions.adv_replies.search_links:
+        enabled: false
+    extensions.anti_spam.anti_spam:
+        enabled: false
+    extensions.counting.letter_counting:
+        enabled: false
+    extensions.danked_memer.blackjack_assist:
+        enabled: false
+    extensions.messagehook.messagehook:
+        enabled: false
+    extensions.mod_utils.keep_roles:
+        enabled: false
+    extensions.nerd_utils.commands:
+        enabled: false
+    extensions.simple_games.minesweeper:
+        enabled: false
+    extensions.simple_games.twenty_four:
+        enabled: false
+    extensions.welcomer.member_join:
+        enabled: false

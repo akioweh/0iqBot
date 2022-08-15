@@ -1,3 +1,7 @@
+"""Helpers to safely evaluate different expressions as strings.
+
+Currently only contains a MathParser"""
+
 import ast
 import operator as op
 from numbers import Number
