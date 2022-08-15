@@ -1,7 +1,6 @@
+import sys
 import traceback
 from typing import ContextManager, Type
-
-import sys
 
 
 class protect(ContextManager):
@@ -26,7 +25,7 @@ class protect(ContextManager):
 
         :param exceptions: Variable number of exceptions to catch and protect from.
             If not specified, all exceptions are caught and protected
-        :param compact: If true, only prints the exception message (if it has one), otherwise prints a full traceback
+        :param compact: If true, prints shorter one-line error message without traceback
         """
         self.exceptions = exceptions
         self.compact = compact
@@ -42,7 +41,7 @@ class protect(ContextManager):
                 return False
             # protect from this error, and print traceback/error message
             if self.compact:
-                print(exc_val, file=sys.stderr)
+                print(f'{exc_type.__name__}: {exc_val}', file=sys.stderr)
             else:
                 print(f'Exception ignored and resuming execution of the remaining program:', file=sys.stderr)
                 traceback.print_exc()
