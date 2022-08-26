@@ -1,11 +1,18 @@
-from asyncio import CancelledError, Task, TimeoutError, all_tasks, gather, iscoroutinefunction, wait_for
-from collections.abc import Coroutine
+from asyncio import (CancelledError,
+                     Future,
+                     Task,
+                     TimeoutError,
+                     all_tasks,
+                     gather,
+                     iscoroutinefunction,
+                     wait_for)
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module
 from os import getcwd, getenv
-from signal import SIGINT, SIGTERM, SIG_IGN, signal
+from signal import SIGINT, SIG_IGN, signal
 from sys import exc_info, platform as __platform__, stderr as __stderr__, stdout as __stdout__
+from threading import Thread
 from traceback import print_exception
 from types import ModuleType
 from typing import Callable, Final, Optional
@@ -41,8 +48,14 @@ def _subprocess_initializer():
 
 
 class BotClient(commands.Bot):
-    _connect_init_ed: bool
+    DEBUG: bool
     _async_init_ed: bool
+    _connect_init_ed: bool
+    _sync_shut: bool
+    _async_shut: bool
+    _running: bool
+    thread: Optional[Thread]
+    runner: Optional[Task]
     latest_message: Optional[Message]
     aiohttp_session: Optional[ClientSession]
     process_pool: Optional[ProcessPoolExecutor]
@@ -56,6 +69,13 @@ class BotClient(commands.Bot):
         self.DEBUG: Final = getenv('DEBUG', 'false').lower() == 'true'
         self._async_init_ed = False
         self._connect_init_ed = False
+        self._sync_shut = False
+        self._async_shut = False
+        self._running = False
+
+        # Run-management stuff
+        self.thread = None
+        self.runner = None
 
         # Configuration stuff
         self.configs, self.guild_configs = load_configs()
@@ -64,7 +84,7 @@ class BotClient(commands.Bot):
 
         prefix_check = self.mentioned_or_in_prefix \
             if self.configs['bot']['reply_to_mentions'] else self.in_prefix
-        process_count = options.pop('multiprocessing', 0)
+        self._process_count = options.pop('multiprocessing', 0)
 
         # Init superclass with bot options
         self.__status = options.pop('status', None)
@@ -80,12 +100,12 @@ class BotClient(commands.Bot):
         self.latest_message = None
         self.aiohttp_session = None
         self.process_pool = None
-        if process_count != 0:
-            self.process_pool = ProcessPoolExecutor(max_workers=process_count, initializer=_subprocess_initializer)
+        if self._process_count > 0:
+            self.process_pool = ProcessPoolExecutor(max_workers=self._process_count, initializer=_subprocess_initializer)
 
         # Extension stuff
-        exts = import_module(self.configs['bot']['extension_dir'], getcwd())
-        self.load_extensions(exts)
+        self._ext_module = import_module(self.configs['bot']['extension_dir'], getcwd())
+        self.load_extensions(self._ext_module)
 
         # Debug stuff
         if self.DEBUG:
@@ -142,7 +162,7 @@ class BotClient(commands.Bot):
         log('Post-Connection Initialization Finished', tag='Connection')
         return True
 
-    def to_process(self, func: Callable[Param, T], *args) -> Coroutine[None, Param, T]:
+    def to_process(self, func: Callable[Param, T], *args) -> Future[T]:
         """
         Converts a blocking/cpu-bound subroutine into an
         awaitable coroutine by running it in a process pool
@@ -159,9 +179,12 @@ class BotClient(commands.Bot):
     def load_extensions(self, package: ModuleType):
         """Load all valid extensions within a Python package.
         Recursively crawls through all subdirectories"""
+        n = 0
         extensions = get_all_extensions_from(package)
         for extension in extensions:
             self.load_extension(extension)
+            n += 1
+        log(f'Loaded {n} extensions from {package.__name__}')
 
     @staticmethod
     async def blocked_check(ctx: commands.Context):
@@ -554,28 +577,77 @@ class BotClient(commands.Bot):
         for guild_id, config in self.guild_configs.items():
             save_guild_config(config, guild_id)
 
+    def unload_extensions(self):
+        """Unloads **ALL** loaded extensions & cogs"""
+        n = len(self.extensions)
+        for extension in tuple(self.extensions.keys()):
+            with protect():
+                self.unload_extension(extension)
+
+        n += len(self.cogs)
+        for cog in tuple(self.cogs.keys()):
+            with protect():
+                self.remove_cog(cog)
+        log(f'Unloaded {n} extensions & cogs.')
+
     async def close(self):
         """Do Not Override"""
         await self.__close_connect__()
-        await super().close()
+
+        if self._closed:
+            log('close() called more than once', tag='Warning')
+            return
+
+        await self.http.close()
+        self._closed = True
+
+        for voice in self.voice_clients:
+            with protect():
+                await voice.disconnect()
+
+        if self.ws is not None and self.ws.open:
+            await self.ws.close(code=1000)
+
+        self._ready.clear()
 
     async def __close_connect__(self):
-        """Called before connection to Discord is closed."""
+        """Called before connection to Discord is closed.
+        Do Not Directly Call"""
         await self.change_presence(status=Status('offline'))
         log('Closing connection to Discord...', tag='Connection')
 
     async def __shutdown_async__(self):
-        """Called before the asyncio event loop halts."""
-        log('Closing aiohttp session...', tag='Shutdown')
-        await self.aiohttp_session.close()
-        log('Aiohttp session closed.', tag='Shutdown')
+        """Called before the asyncio event loop halts.
+        Do Not Directly Call"""
+        if self._async_shut:
+            log('__shutdown_async__() called more than once', tag='Warning')
+            return
+        self._async_shut = True
+
+        if self.aiohttp_session:
+            log('Closing aiohttp session...', tag='Shutdown')
+            await self.aiohttp_session.close()
+            log('Aiohttp session closed.', tag='Shutdown')
 
     def __shutdown_sync__(self):
-        """Called before blocking run() call exits"""
+        """Called before blocking run() call exits
+        Do Not Directly Call"""
+        if self._sync_shut:
+            log('__shutdown_sync__() called more than once.', tag='Warning')
+            return
+        self._sync_shut = True
+
+        log('Unloading extensions...', tag='Shutdown')
+        with protect():
+            self.unload_extensions()
+
         log('Saving Configs...', tag='Shutdown')
-        save_config(self.configs)
-        self.save_guild_configs()
+        with protect():
+            save_config(self.configs)
+        with protect():
+            self.save_guild_configs()
         log('All Configs saved.', tag='Shutdown')
+
         if self.process_pool is not None:
             log('Shutting down process pool...', tag='Shutdown')
             self.process_pool.shutdown(wait=True, cancel_futures=True)
@@ -600,7 +672,7 @@ class BotClient(commands.Bot):
                 if t.cancelled():
                     return None
                 if t.done():
-                    return t.result() or t.exception()
+                    return t.exception() or t.result()
                 t.cancel()
                 return await t
 
@@ -617,20 +689,49 @@ class BotClient(commands.Bot):
 
         log('All lingering tasks cancelled.', tag='Shutdown')
 
-    def shut_async_loop(self):
-        """Completely and forcibly stops and closes the asyncio event loop.
+    def stop_async_loop(self, *_):
+        """Completely and forcibly stops the asyncio event loop.
         Catastrophic if called in the middle of an active connection."""
+        log('Stopping asyncio event loop...', tag='Shutdown')
         with protect():
             self.loop.run_until_complete(self.__shutdown_async__())
 
-        log('Closing asyncio event loop...', tag='Shutdown')
-        with protect():
-            self._cancel_asyncio_tasks()
-        with protect():
-            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+        if self.loop.is_running():  # if the loop is still running, cancel all tasks
+            with protect():
+                self._cancel_asyncio_tasks()
+            with protect():
+                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
 
-        self.loop.close()
-        log('Asyncio event loop closed.', tag='Shutdown')
+        if self.loop.is_running():
+            self.loop.stop()
+            log('Waiting for asyncio event loop to stop...', tag='Shutdown')
+        while self.loop.is_running():
+            pass
+
+        log('Asyncio event loop stopped.', tag='Shutdown')
+
+    def clear(self):
+        """Resets all flags, clears all caches,
+        and resets all states of the bot...
+        hopefully, without missing anything"""
+        self._async_init_ed = False
+        self._connect_init_ed = False
+        self._sync_shut = False
+        self._async_shut = False
+        self._running = False
+        self.runner = None
+        self.aiohttp_session = None
+
+        # the process pool and extensions hav to be reinitialized because they get shut down/unloaded
+        # and is only initialized in __init__, which we do not call again (obviously)
+        # todo: move these to a better place
+        if self._process_count > 0:
+            self.process_pool = ProcessPoolExecutor(max_workers=self._process_count, initializer=_subprocess_initializer)
+        self.load_extensions(self._ext_module)
+
+        self._closed = False
+        self._ready.clear()
+        self._connection.clear()
 
     async def start(self, token: str, *, bot: bool = True, reconnect: bool = True):
         """Do Not Override"""
@@ -642,54 +743,93 @@ class BotClient(commands.Bot):
 
         -> Starts asyncio event loop
 
-        -> establishes connection with Discord and logs in
+        -> Establishes connection with Discord and logs in
 
         -> (When stop signal detected)
-        closes connection with Discord
+        Closes connection with Discord
 
-        -> Shuts down asyncio event loop
+        -> Stops asyncio event loop
 
-        Blocks for as long as the bot is running & not fully shut-down."""
+        Blocks for as long as the bot is running & not fully shut-down.
+        """
+        if self._running:
+            raise RuntimeError('Bot is already running.')
+        self._running = True
 
         async def run_loop():  # runs the Discord Connection
             try:
                 await self.start(token, bot=bot, reconnect=reconnect)
-            except CancelledError:
-                # this is here because the task canceller will try to cancel this too,
-                # but we can stop it gracefully and close the Discord connection
-                log('Ignoring Cancellation and proceeding to close Discord connection.', tag='Runner')
+            except CancelledError:  # the default "signal" to stop the bot
+                log('Received Termination signal (task cancellation).', tag='Runner')
             except KeyboardInterrupt:
                 log('KeyboardInterrupt detected', tag='Runner')
+            except BaseException as e:
+                print(e)
             finally:
                 if not self.is_closed():
                     await self.close()
                 log('Discord Connection Closed.', tag='Runner')
 
-        def close_loop(*_, **__):  # shuts down asyncio event loop
-            self.shut_async_loop()
-
-        with suppress(NotImplementedError):  # unix only
-            self.loop.add_signal_handler(SIGINT, close_loop)
-            self.loop.add_signal_handler(SIGTERM, close_loop)
+        # with suppress(NotImplementedError):  # unix only
+        #     # Remove (all existing) then add one handler to avoid duplicates when run()
+        #     # is called multiple times on one instance of the bot.
+        #     self.loop.remove_signal_handler(SIGINT)
+        #     self.loop.remove_signal_handler(SIGTERM)
+        #     self.loop.add_signal_handler(SIGINT, self.stop_async_loop)
+        #     self.loop.add_signal_handler(SIGTERM, self.stop_async_loop)
 
         # initialize bot stuff
         with protect():
             self.loop.run_until_complete(self.__init_async__())
 
-        run_: Task = self.loop.create_task(run_loop())
+        self.runner: Task = self.loop.create_task(run_loop())
+        self.runner.add_done_callback(lambda _: log('Runner exited.', tag='Runner'))
 
         try:
-            self.loop.run_until_complete(run_)
-        except (KeyboardInterrupt, EOFError):
-            log('Received signal to terminate bot and event loop.')
-        finally:
-            close_loop()
+            self.loop.run_until_complete(self.runner)
+        except KeyboardInterrupt:
+            log('Received Interrupt to close and stop bot.')
+            if not self.runner.done():
+                self.runner.cancel()
+                self.loop.run_until_complete(self.runner)
+
+        self.stop_async_loop()
 
         with protect():
             self.__shutdown_sync__()
 
-        if not run_.cancelled():  # this should um... return exceptions (I think?)
-            return run_.result()
+        # Reset all flags and states of the bot then return
+        self.clear()
+
+    def run_threaded(self, token: str, *, bot: bool = True, reconnect: bool = True):
+        """Starts and runs the bot,
+        in a separate thread.
+
+        Non-blocking. Stop bot with stop()"""
+        if self.thread:
+            raise RuntimeError('Bot is already running in a thread.')
+        if self._running:
+            raise RuntimeError('Bot is already running.')
+
+        self.thread = Thread(target=self.run, name='Runner', args=(token,), kwargs={'bot': bot, 'reconnect': reconnect})
+        self.thread.start()
+        log('Bot started in a separate thread.')
+
+    def stop(self):
+        """Complete closure and shutdown of the bot,
+        by signalling for run() to stop gracefully.
+
+        Can be manually called to stop run_threaded()"""
+        if not self.thread:
+            raise RuntimeError('Tried to stop threaded running not but there are no threads.')
+
+        log('Stopping bot in runner thread...')
+        with protect():
+            self.loop.call_soon_threadsafe(self.runner.cancel)
+
+        self.thread.join()
+        log('Bot and runner thread stopped.')
+        self.thread = None
 
 
 __all__ = ['BotClient']
