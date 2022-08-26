@@ -14,7 +14,7 @@ ext:
     messagehook:
     reactomatic:
     welcomer:
-        welcome_channel: 839457899360157709
+        welcome_channel: 747499579527659540
     extensions.adv_replies.adv_info:
         enabled: false
     extensions.adv_replies.mojira_embed:
