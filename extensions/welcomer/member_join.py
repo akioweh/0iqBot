@@ -31,7 +31,10 @@ class Welcomer(Cog):
         embed_data = {
             "type"       : "rich",
             "title"      : f"Welcome `{member.name}` to {member.guild.name}!",
-            "description": f"**You are Member #`{member.guild.member_count}`\nGlad to see you here, {member.mention}! 👋**\n\nNow that you see this message, please, please, please, do not just leave straight away <:pepesmile:867100567151181824>, please. *Well, I can't really stop you... can I?*",
+            "description": f"**You are Member #`{member.guild.member_count}`\nGlad to see you here, "
+                           f"{member.mention}! 👋**\n\nNow that you see this message, please, please, please, "
+                           f"do not just leave straight away <:pepesmile:867100567151181824>, please. *Well, "
+                           f"I can't really stop you... can I?*",
             "color"      : 16711680,
             "author"     : {
                 "name"    : f"{member.name}#{member.discriminator}",
@@ -50,13 +53,15 @@ class Welcomer(Cog):
         if not (welcome_channel := await self.get_welcome_channel(member.guild)):
             return
         time_difference = datetime.datetime.utcnow() - member.joined_at
-        await welcome_channel.send(f'It took `{member.name}` **`{time_difference}`** to complete the Member Verification. <:pepesmile:867100567151181824>')
+        await welcome_channel.send(f'It took `{member.name}` **`{time_difference}`** '
+                                   f'to complete the Member Verification. <:pepesmile:867100567151181824>')
 
     @Cog.listener()
     async def on_member_remove(self, member: Member):
         if not (welcome_channel := await self.get_welcome_channel(member.guild)):
             return
-        await welcome_channel.send(f'**`{member.name}#{member.discriminator}`** just left the server <:sad:736527953235804161>')
+        await welcome_channel.send(
+            f'**`{member.name}#{member.discriminator}`** just left the server <:sad:736527953235804161>')
 
 
 def setup(bot):

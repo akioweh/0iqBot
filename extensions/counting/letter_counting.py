@@ -22,11 +22,11 @@ ALPHABET_SIZE = 26
 class LetterCounting(Cog):
     def __init__(self, bot: 'BotClient'):
         self.bot = bot
-        self.config_init(__file__)
-        if 'channels' not in self.config:
-            self.config['channels'] = list()
-        if 'regex' not in self.config:
-            self.config['regex'] = ''
+        self.init_local_config(__file__)
+        if 'channels' not in self.local_config:
+            self.local_config['channels'] = list()
+        if 'regex' not in self.local_config:
+            self.local_config['regex'] = ''
         self.delete_queue = []
 
     @staticmethod
@@ -58,7 +58,7 @@ class LetterCounting(Cog):
         async for msg in chl.history(limit=limit, oldest_first=oldest_first, **kwargs):
             if not isinstance(msg, Message):
                 continue
-            content = re.sub(self.config['regex'], '', msg.content)
+            content = re.sub(self.local_config['regex'], '', msg.content)
             num = LetterCounting.base_alphabet_to_10(content)
             if num == expected:
                 expected += 1
@@ -73,7 +73,7 @@ class LetterCounting(Cog):
 
     @Cog.listener()
     async def on_message(self, message: Message):
-        if message.channel.id not in self.config['channels']:
+        if message.channel.id not in self.local_config['channels']:
             return
         if message.author.id == self.bot.user.id:
             return

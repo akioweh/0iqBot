@@ -11,19 +11,19 @@ if TYPE_CHECKING:
 class KeepRoles(Cog):
     def __init__(self, bot: 'BotClient'):
         self.bot = bot
-        self.config_init(__file__)
-        if 'keep_roles' not in self.config:
-            self.config['keep_roles'] = {'logs': dict()}
+        self.init_local_config(__file__)
+        if 'keep_roles' not in self.local_config:
+            self.local_config['keep_roles'] = {'logs': dict()}
 
     @Cog.listener()
     async def on_member_remove(self, member: Member):
         roles = [role.id for role in member.roles[1:]]
         if not roles:
             return
-        if member.id not in self.config['keep_roles']['logs']:
-            self.config['keep_roles']['logs'] = {member.id: {member.guild.id: list()}}
-        self.config['keep_roles']['logs'][member.id][member.guild.id] = roles
-        self.save_config()
+        if member.id not in self.local_config['keep_roles']['logs']:
+            self.local_config['keep_roles']['logs'] = {member.id: {member.guild.id: list()}}
+        self.local_config['keep_roles']['logs'][member.id][member.guild.id] = roles
+        self.save_local_config()
 
     @Cog.listener()
     async def on_verification_complete(self, member: Member):
@@ -32,7 +32,7 @@ class KeepRoles(Cog):
         # which causes FAST automatic verification
         # and defeats the purpose of using skill to get a short time
         try:
-            role_ids = self.config['keep_roles']['logs'][member.id][member.guild.id]
+            role_ids = self.local_config['keep_roles']['logs'][member.id][member.guild.id]
         except KeyError:
             return
         roles = [member.guild.get_role(i) for i in role_ids if member.guild.get_role(i)]

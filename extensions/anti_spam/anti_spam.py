@@ -133,16 +133,16 @@ class AntiSpam(Cog):
     def __init__(self, bot: 'BotClient'):
         self.bot = bot
         self._trackers: dict[Member, Tracker] = dict()
-        self.config_init(__file__)
+        self.init_local_config(__file__)
 
         default_config = {'flag_threshold': -5, 'mute_threshold': -6.5, 'unmute_reserve': -0.3,
                           'enabled_guilds': {}}
-        default_config.update(self.config)
-        self.config.update(default_config)
+        default_config.update(self.local_config)
+        self.local_config.update(default_config)
 
     @property
     def enabled_guids(self) -> Iterable[int]:
-        return self.config['enabled_guilds'].keys()
+        return self.local_config['enabled_guilds'].keys()
 
     @Cog.listener(name='on_message_all')
     async def _process_message(self, msg: Message):
@@ -194,7 +194,7 @@ class AntiSpam(Cog):
             rep_mlt, score)
 
     async def _detail_log(self, msg: Message, data: tuple) -> str:
-        chl_id = self.config['enabled_guilds'][msg.guild.id]['detail_log_channel']
+        chl_id = self.local_config['enabled_guilds'][msg.guild.id]['detail_log_channel']
         if not chl_id:
             return 'detailed logging not enabled'
         chl = self.bot.get_channel(chl_id)
@@ -226,7 +226,7 @@ class AntiSpam(Cog):
         return (await chl.send(embed=Embed.from_dict(embed_data))).jump_url
 
     async def _flagged_log(self, msg: Message, log_url: str):
-        chl_id = self.config['enabled_guilds'][msg.guild.id]['flagged_log_channel']
+        chl_id = self.local_config['enabled_guilds'][msg.guild.id]['flagged_log_channel']
         if not chl_id:
             return
         chl = self.bot.get_channel(chl_id)
@@ -249,21 +249,21 @@ class AntiSpam(Cog):
             with protect(compact=True):
                 log_url = await self._detail_log(msg, data_log)
 
-            if score < self.config['flag_threshold']:
+            if score < self.local_config['flag_threshold']:
                 with protect(compact=True):
                     await self._flagged_log(msg, log_url)
 
                 with suppress(Forbidden):
                     await msg.channel.send(f'{member.mention} stop spam or mute.')
 
-        if score < self.config['mute_threshold']:
+        if score < self.local_config['mute_threshold']:
             if not tracker.muted:
-                unmute_delay = tracker.time_until_score(self.config['unmute_reserve'])
+                unmute_delay = tracker.time_until_score(self.local_config['unmute_reserve'])
                 await tracker.mute(unmute_delay)
                 with suppress(Forbidden):
                     msg and await msg.channel.send(f'{member.mention} get muted heheheha')
 
-        elif score > self.config['unmute_reserve']:
+        elif score > self.local_config['unmute_reserve']:
             if tracker.muted:
                 print(f'prematurely cancelling scheduled unmute task for {member} because apparently score went past unmute reserve')
                 await tracker.unmute()
