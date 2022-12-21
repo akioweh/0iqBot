@@ -550,7 +550,7 @@ class BotClient(commands.Bot):
 
         for guild in guilds:
             for ext_name, ext in self.extensions.items():
-                ext_key = parent_package_path(ext).partition(self.ext_module_name)[2].lstrip('.')
+                ext_key = parent_package_path(ext, self.ext_module_name)
                 if not ext_key:  # extensions not in the standard extension directory will have an empty key
                     continue
                 if ext_key not in self.guild_configs[guild.id]['ext']:
