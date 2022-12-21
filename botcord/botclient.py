@@ -1,16 +1,9 @@
-from asyncio import (CancelledError,
-                     Future,
-                     Task,
-                     TimeoutError,
-                     all_tasks,
-                     gather,
-                     iscoroutinefunction,
-                     wait_for)
+from asyncio import CancelledError, Future, Task, TimeoutError, all_tasks, gather, iscoroutinefunction, wait_for
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
-from importlib import import_module
+from importlib import import_module, invalidate_caches
 from os import getcwd, getenv
-from signal import SIGINT, SIG_IGN, signal
+from signal import SIGINT, SIGTERM, SIG_IGN, signal
 from sys import exc_info, platform as __platform__, stderr as __stderr__, stdout as __stdout__
 from threading import Thread
 from traceback import print_exception
@@ -28,7 +21,7 @@ from .errors import ExtensionDisabledGuild
 from .functions import *
 from .types import Param, SupportsWrite, T
 from .utils.errors import protect
-from .utils.extensions import get_all_extensions_from
+from .utils.extensions import get_all_extensions_from, parent_package_path
 
 # Fix to stop aiohttp spamming errors in stderr when closing because that is uglier
 if __platform__.startswith('win'):
@@ -104,8 +97,10 @@ class BotClient(commands.Bot):
             self.process_pool = ProcessPoolExecutor(max_workers=self._process_count, initializer=_subprocess_initializer)
 
         # Extension stuff
+        self.load_extensions(import_module('..builtins', self.__module__))  # loads builtin extensions
         self._ext_module = import_module(self.configs['bot']['extension_dir'], getcwd())
-        self.load_extensions(self._ext_module)
+        self.ext_module_name = self._ext_module.__name__
+        self.load_extensions(self._ext_module)  # loads custom extensions
 
         # Debug stuff
         if self.DEBUG:
@@ -175,6 +170,14 @@ class BotClient(commands.Bot):
             raise RuntimeError('No process pool was configured to initialize (pass non-zero process count to __init__'
                                'option with key "multiprocessing" to initialize a process pool)')
         return self.loop.run_in_executor(self.process_pool, func, *args)
+
+    @property
+    def ext_module(self) -> ModuleType:
+        """reimports root extension package;
+        runs synchronously..."""
+        invalidate_caches()
+        self._ext_module = import_module(self.configs['bot']['extension_dir'], getcwd())
+        return self._ext_module
 
     def load_extensions(self, package: ModuleType):
         """Load all valid extensions within a Python package.
@@ -538,9 +541,12 @@ class BotClient(commands.Bot):
         # ========== Create Config Field for each Extension ========== #
 
         for guild in guilds:
-            for ext_name in self.extensions.keys():
-                if ext_name not in self.guild_configs[guild.id]['ext']:
-                    self.guild_configs[guild.id]['ext'][ext_name] = {'enabled': False}  # default to disabled
+            for ext_name, ext in self.extensions.items():
+                ext_key = parent_package_path(ext).partition(self.ext_module_name)[2].lstrip('.')
+                if not ext_key:  # extensions not in the standard extension directory will have an empty key
+                    continue
+                if ext_key not in self.guild_configs[guild.id]['ext']:
+                    self.guild_configs[guild.id]['ext'][ext_key] = {'enabled': False}  # default to disabled
 
         # saves any changes made to file
         self.save_guild_configs()
@@ -722,7 +728,7 @@ class BotClient(commands.Bot):
         self.runner = None
         self.aiohttp_session = None
 
-        # the process pool and extensions hav to be reinitialized because they get shut down/unloaded
+        # the process pool and extensions have to be reinitialized because they get shut down/unloaded
         # and is only initialized in __init__, which we do not call again (obviously)
         # todo: move these to a better place
         if self._process_count > 0:
@@ -770,13 +776,13 @@ class BotClient(commands.Bot):
                     await self.close()
                 log('Discord Connection Closed.', tag='Runner')
 
-        # with suppress(NotImplementedError):  # unix only
-        #     # Remove (all existing) then add one handler to avoid duplicates when run()
-        #     # is called multiple times on one instance of the bot.
-        #     self.loop.remove_signal_handler(SIGINT)
-        #     self.loop.remove_signal_handler(SIGTERM)
-        #     self.loop.add_signal_handler(SIGINT, self.stop_async_loop)
-        #     self.loop.add_signal_handler(SIGTERM, self.stop_async_loop)
+        with suppress(NotImplementedError):  # unix only
+            # Remove (all existing) then add one handler to avoid duplicates when run()
+            # is called multiple times on one instance of the bot.
+            self.loop.remove_signal_handler(SIGINT)
+            self.loop.remove_signal_handler(SIGTERM)
+            self.loop.add_signal_handler(SIGINT, self.stop_async_loop)
+            self.loop.add_signal_handler(SIGTERM, self.stop_async_loop)
 
         # initialize bot stuff
         with protect():
