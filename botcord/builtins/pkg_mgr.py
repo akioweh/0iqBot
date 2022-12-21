@@ -6,7 +6,7 @@ from discord.ext.commands import Context, group
 
 from ..ext.commands.checks import has_global_perms
 from ..ext.commands.cog import Cog
-from ..utils.extensions import full_extension_path
+from ..utils.extensions import full_extension_path, parent_package_path
 
 if TYPE_CHECKING:
     from ..botclient import BotClient
@@ -64,6 +64,24 @@ class PkgMgr(Cog):
             await ctx.reply(f'Extension `{extension}` (`{qualified_name}`) reloaded.')
         except(ImportError, NameError) as e:
             await ctx.reply(e)
+
+    @pkgmgr.command()
+    @has_global_perms(owner=True)
+    async def list(self, ctx: Context):
+        """lists all loaded extensions"""
+        msg = '__**Loaded extensions**__:\n (``✅ -> enabled``; ``❌ -> disabled``; ``❔ -> unknown``)\n'
+
+        for ext in self.bot.extensions.keys():
+            try:  # try to get the extension's enabled status for the current guild
+                enabled = self.bot.guild_config(ctx.guild)['ext'][parent_package_path(ext, self.bot.ext_module_name)]['enabled']
+                status = '✅' if enabled else '❌'
+            except (KeyError, FileNotFoundError):
+                status = '❔'
+
+            full_name = ext.rpartition('.')
+            msg += f'``{status} {full_name[0]}{full_name[1]}``**``{full_name[2]}``**\n' if full_name[2] else f'**``{full_name[0]}``**\n'
+
+        await ctx.reply(msg)
 
 
 def setup(bot: 'BotClient'):
