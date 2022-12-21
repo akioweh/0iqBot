@@ -122,6 +122,7 @@ class BotClient(commands.Bot):
 
         # call async initializers for any cogs that have them
         tasks = []
+        corresponding_cogs = []  # for error handling
         for cog in self.cogs.values():
             if not hasattr(cog, '__init_async__'):
                 continue
@@ -130,8 +131,15 @@ class BotClient(commands.Bot):
                     f'but is {type(cog.__init_async__)} for cog {cog.__class__.__name__}', tag='Warn', file=__stderr__)
                 continue
             tasks.append(cog.__init_async__())
+            corresponding_cogs.append(cog)
 
-        await gather(*tasks)
+        results = await gather(*tasks, return_exceptions=True)
+
+        # print errors if any
+        for result, cog in zip(results, corresponding_cogs):
+            if isinstance(result, Exception):
+                print(f'Ignoring exception while running __init_async__ for {cog.__class__.__name__}:', file=__stderr__)
+                print_exception(type(result), result, result.__traceback__, file=__stderr__)
 
         log('Asynchronous Initialization Finished', tag='Init')
         return True
