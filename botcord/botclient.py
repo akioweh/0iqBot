@@ -3,7 +3,7 @@ from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module, invalidate_caches
 from os import getcwd, getenv
-from signal import SIGINT, SIGTERM, SIG_IGN, signal
+from signal import SIGINT, SIG_IGN, signal
 from sys import exc_info, platform as __platform__, stderr as __stderr__, stdout as __stdout__
 from threading import Thread
 from traceback import print_exception
@@ -776,13 +776,13 @@ class BotClient(commands.Bot):
                     await self.close()
                 log('Discord Connection Closed.', tag='Runner')
 
-        with suppress(NotImplementedError):  # unix only
-            # Remove (all existing) then add one handler to avoid duplicates when run()
-            # is called multiple times on one instance of the bot.
-            self.loop.remove_signal_handler(SIGINT)
-            self.loop.remove_signal_handler(SIGTERM)
-            self.loop.add_signal_handler(SIGINT, self.stop_async_loop)
-            self.loop.add_signal_handler(SIGTERM, self.stop_async_loop)
+        # with suppress(NotImplementedError):  # unix only
+        #     # Remove (all existing) then add one handler to avoid duplicates when run()
+        #     # is called multiple times on one instance of the bot.
+        #     self.loop.remove_signal_handler(SIGINT)
+        #     self.loop.remove_signal_handler(SIGTERM)
+        #     self.loop.add_signal_handler(SIGINT, self.stop_async_loop)
+        #     self.loop.add_signal_handler(SIGTERM, self.stop_async_loop)
 
         # initialize bot stuff
         with protect():
