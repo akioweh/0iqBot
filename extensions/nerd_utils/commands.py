@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from discord.ext.commands import Cog, command, Context
+from discord.ext.commands import Cog, Context, command
 
 from botcord.functions import batch
 from .socialscan.util import execute_queries
@@ -29,5 +29,5 @@ class NerdUtils(Cog):
         await ctx.reply('Finished Scan.')
 
 
-def setup(bot):
-    bot.add_cog(NerdUtils(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(NerdUtils(bot))

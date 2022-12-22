@@ -7,12 +7,12 @@ from discord import AllowedMentions, Forbidden, HTTPException, Member, NotFound,
 from discord.ext.commands import Cog, Context, command
 
 if TYPE_CHECKING:
-    import botcord
+    from botcord import BotClient
 
 
 # noinspection SpellCheckingInspection,DuplicatedCode
 class MessageHook(Cog):
-    def __init__(self, bot: 'botcord.BotClient'):
+    def __init__(self, bot: 'BotClient'):
         self.bot = bot
         self.mentions = AllowedMentions(everyone=False, users=True, roles=False)
 
@@ -55,7 +55,7 @@ class MessageHook(Cog):
             delete = asyncio.create_task(ctx.message.delete())
 
         try:
-            await MessageHook.send(ctx.channel, text, user.name, user.avatar_url, attachments, self.mentions)
+            await MessageHook.send(ctx.channel, text, user.name, user.avatar.url, attachments, self.mentions)
         except Forbidden:
             with suppress(Forbidden):
                 await ctx.reply('Missing Permissions', delete_after=5)
@@ -114,5 +114,5 @@ class MessageHook(Cog):
                               allowed_mentions=allowed_mentions)
 
 
-def setup(bot: 'botcord.BotClient'):
-    bot.add_cog(MessageHook(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(MessageHook(bot))

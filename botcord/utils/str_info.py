@@ -16,12 +16,17 @@ from discord import (Activity,
 def member_details(m: Member) -> str:
     """Gives you more info about a member than what the CIA has on them,
     all while formatting everything nicely :)"""
-    return f"**Server Joined:** `{m.joined_at.strftime('%d/%m/%Y, %H:%M:%S') if m.joined_at else 'N/A'}` \n" \
+    return f"**`{m.name}`#`{m.discriminator}`** (`{m.id}`) \n" \
+           f"**Bot Account:** `{getattr(m, 'bot', 'N/A')}` \n" \
+           f"**Official Account:** `{getattr(m, 'system', 'N/A')}` \n" \
+           f"**Created At:** {m.created_at.strftime('%d/%m/%Y, %H:%M:%S') if m.created_at else 'N/A'} \n" \
+           f"**Server Joined:** `{m.joined_at.strftime('%d/%m/%Y, %H:%M:%S') if m.joined_at else 'N/A'}` \n" \
            f"**Current Activities:** \n```\n{activity_details(*m.activities) if m.activities else 'N/A'}\n``` \n" \
            f"**Current Server:** `{m.guild.name if hasattr(m, 'guild') else 'N/A'}` \n" \
            f"**Nick Name:** `{getattr(m, 'nick', 'N/A')}` \n" \
            f"**Pending Member Verification:** `{getattr(m, 'pending', 'N/A')}` \n" \
            f"**Server Boosting Since:** `{m.premium_since.strftime('%d/%m/%Y, %H:%M:%S') if m.premium_since else 'N/A'}` \n" \
+           f"**Timed-out Until:** `{m.timed_out_until.strftime('%d/%m/%Y, %H:%M:%S') if m.timed_out_until else 'N/A'}` \n" \
            f"**Recent Messages:** TODO \n" \
            f"**Raw Status:** `{getattr(m, 'raw_status', 'N/A')}` " \
            f"**(mobile):** `{getattr(m, 'mobile_status', 'N/A')}` " \
@@ -37,13 +42,11 @@ def member_details(m: Member) -> str:
            f"**Server Permissions:** TODO \n" \
            f"**Voice State:** TODO \n" \
            f"**Avatar URL:** `{getattr(m, 'avatar_url', 'N/A')}` \n" \
-           f"**Bot Account:** `{getattr(m, 'bot', 'N/A')}` \n" \
            f"**Account Created:** `{m.created_at.strftime('%d/%m/%Y, %H:%M:%S') if hasattr(m, 'created_at') else 'N/A'}` \n" \
            f"**DM Channel:** `{getattr(m, 'dm_channel', 'N/A')}` \n" \
            f"**User ID:** `{getattr(m, 'id', 'N/A')}` \n" \
-           f"**Animated Avatar:** `{m.is_avatar_animated()}` \n" \
-           f"**Public Badges:** \n```\n{badge_names(m.public_flags) if hasattr(m, 'public_flags') else 'N/A'}\n``` \n" \
-           f"**Official Account:** `{getattr(m, 'system', 'N/A')}` \n"
+           f"**Animated Avatar:** `{m.avatar.is_animated()}` \n" \
+           f"**Public Badges:** \n```\n{badge_names(m.public_flags) if hasattr(m, 'public_flags') else 'N/A'}\n``` \n"
 
 
 def activity_details(*activities: BaseActivity) -> str:

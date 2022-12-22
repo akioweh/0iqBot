@@ -1,6 +1,7 @@
 from os.path import abspath as _abspath, dirname as _dirname
 from typing import TYPE_CHECKING
 
+from discord.abc import Snowflake
 from discord.ext.commands import Cog as _bruh_do_not_import_this_Cog
 
 from botcord.configs import YAML_rw as _YAML, recursive_update as _recursive_update
@@ -44,11 +45,11 @@ class Cog(_bruh_do_not_import_this_Cog):
     """
     bot: 'BotClient'
 
-    def _inject(self, bot: 'BotClient'):
+    def _inject(self, bot: 'BotClient', override: bool, guild: Snowflake | None, guilds: list[Snowflake]):
         # Makes sure self.bot is always set
         if getattr(self, 'bot', None) is None:
             self.bot = bot
-        return super()._inject(bot)
+        return super()._inject(bot, override, guild, guilds)
 
     def init_local_config(self, file, path='configs.yml'):
         """PASS THE __file__ VARIABLE IN AS AN ARGUMENT FROM THE EXTENSION FILE,
@@ -115,9 +116,14 @@ class Cog(_bruh_do_not_import_this_Cog):
         """Returns the guild's config for this extension as a dictionary"""
         return self.bot.guild_config(guild.id)[self.global_config_key]
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.save_local_config()
-        super().cog_unload()
+        await super().cog_unload()
+
+    # ========== Custom method pre-Definitions ========== #
+
+    async def __init_async__(self):
+        ...
 
 
 __all__ = ['Cog']

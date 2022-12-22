@@ -297,5 +297,5 @@ class Mojira(Cog):
         return embed_data
 
 
-def setup(bot: 'BotClient'):
-    bot.add_cog(Mojira(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(Mojira(bot))

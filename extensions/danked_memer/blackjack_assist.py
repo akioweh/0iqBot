@@ -98,8 +98,8 @@ async def bj_assist(message: Message, response: Message = None):
     dealer_top = dealer_cards[0]
     msg = f'Your total: **`{"A+" + str(user_total - 11) if user_soft else user_total}`** | Dealer top card: **`{dealer_top}`** \nYou should: **{best_move(user_total, user_soft, dealer_top)}**'
     if response:
-        await response.edit(content=msg)
-        return response
+        edited = await response.edit(content=msg)
+        return edited if edited else response
     else:
         return await message.channel.send(msg)
 
@@ -125,5 +125,5 @@ class BlackJackAssist(Cog):
                     break
 
 
-def setup(bot: 'BotClient'):
-    bot.add_cog(BlackJackAssist(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(BlackJackAssist(bot))

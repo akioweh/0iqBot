@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional, TYPE_CHECKING, Union
 
 from discord import Member, Message, PartialEmoji, Role, TextChannel, User
 from discord.ext.commands import Cog, Context, group
@@ -9,10 +9,13 @@ from discord.ext.commands.errors import UserNotFound
 
 from botcord.utils import find, str_info
 
+if TYPE_CHECKING:
+    from botcord import BotClient
+
 
 class AdvInfo(Cog):
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: 'BotClient' = bot
 
     # ========== Escape Discord Utility ========== #
 
@@ -113,5 +116,5 @@ class AdvInfo(Cog):
         await ctx.reply(str_info.member_details(member))
 
 
-def setup(bot):
-    bot.add_cog(AdvInfo(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(AdvInfo(bot))

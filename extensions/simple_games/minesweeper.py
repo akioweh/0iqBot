@@ -137,5 +137,5 @@ class MineSweeper(Cog):
         await ctx.reply(revealed)
 
 
-def setup(bot: 'BotClient'):
-    bot.add_cog(MineSweeper(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(MineSweeper(bot))

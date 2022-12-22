@@ -142,5 +142,5 @@ class LetterCounting(Cog):
             await msg.edit(content='Operation Completed.')
 
 
-def setup(bot):
-    bot.add_cog(LetterCounting(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(LetterCounting(bot))

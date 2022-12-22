@@ -7,11 +7,11 @@ from discord.ext.commands import Cog
 from botcord.functions import log
 
 if TYPE_CHECKING:
-    import botcord
+    from botcord import BotClient
 
 
 class Welcomer(Cog):
-    def __init__(self, bot: 'botcord.BotClient'):
+    def __init__(self, bot: 'BotClient'):
         self.bot = bot
 
     async def get_welcome_channel(self, guild):
@@ -38,7 +38,7 @@ class Welcomer(Cog):
             "color"      : 16711680,
             "author"     : {
                 "name"    : f"{member.name}#{member.discriminator}",
-                "icon_url": str(member.avatar_url)
+                "icon_url": str(member.avatar.url)
             },
             "footer"     : {
                 "text": "Stay, at least on account of not being greeted by 50 pings and 5 blocked MEE6 messages."
@@ -64,5 +64,5 @@ class Welcomer(Cog):
             f'**`{member.name}#{member.discriminator}`** just left the server <:sad:736527953235804161>')
 
 
-def setup(bot):
-    bot.add_cog(Welcomer(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(Welcomer(bot))

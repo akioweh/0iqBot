@@ -1,16 +1,16 @@
 """24 but twenty_four because python symbols can't start with a number"""
 
+import math
 from asyncio import CancelledError, Future, TimeoutError, ensure_future
 from contextlib import suppress
 from fractions import Fraction
 from operator import add, mul, sub, truediv
 from random import randint
+from time import time
 from typing import Final, Iterator, Optional, TYPE_CHECKING
 
-import math
 from discord import Message
 from discord.ext.commands import Context, group
-from time import time
 
 from botcord.ext.commands import Cog
 from botcord.utils import MathParser
@@ -262,5 +262,5 @@ class TwentyFour(Cog):
         return list(set(TwentyFour._solve(frac, num, target)))
 
 
-def setup(bot):
-    bot.add_cog(TwentyFour(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(TwentyFour(bot))

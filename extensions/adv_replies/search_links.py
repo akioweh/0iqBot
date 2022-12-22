@@ -4,12 +4,12 @@ from urllib.parse import quote_plus as parse_url
 from discord.ext.commands import Cog, command
 
 if TYPE_CHECKING:
-    import botcord
+    from botcord import BotClient
 
 
 class SearchLinks(Cog):
     def __init__(self, bot):
-        self.bot: 'botcord.BotClient' = bot
+        self.bot: 'BotClient' = bot
 
     @command(aliases=['g', 'search', 'bruhwhycouldntyoujustgooglethis'])
     async def google(self, ctx, *, query):
@@ -37,5 +37,5 @@ class SearchLinks(Cog):
         await ctx.send(f'https://www.youtube.com/results?search_query={parse_url(query)}')
 
 
-def setup(bot: 'botcord.BotClient'):
-    bot.add_cog(SearchLinks(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(SearchLinks(bot))

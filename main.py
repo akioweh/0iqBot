@@ -17,7 +17,9 @@ def init():
         while 1:  # basically wait forever until Interrupt
             time.sleep(69420)
     except (KeyboardInterrupt, EOFError):
-        client.stop()
+        pass
+    finally:
+        client.stop_threaded()
 
 
 if __name__ == '__main__':

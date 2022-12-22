@@ -327,5 +327,5 @@ class AntiSpam(Cog):
         await ctx.reply('ok boomer muted.')
 
 
-def setup(bot: 'BotClient'):
-    bot.add_cog(AntiSpam(bot))
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(AntiSpam(bot))
