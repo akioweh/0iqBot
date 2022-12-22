@@ -93,7 +93,7 @@ if TYPE_CHECKING:
 
 
 class Mojira(Cog):
-    COLORS: Final[dict[str, int]] = {   # matches a "resolution" to a color code (base 10)
+    COLORS: Final[dict[str, int]] = {  # matches a "resolution" to a color code (base 10)
         "N/A"              : int('000000', 16),
 
         "Unresolved"       : int('ff0000', 16),  # Open
@@ -113,9 +113,19 @@ class Mojira(Cog):
         self.bot: 'BotClient' = bot
         self.fake_ua: UserAgent | None = None
 
+        self.init_local_config(__file__)
+        if 'use_fakeua' not in self.local_config:
+            self.local_config['use_fakeua'] = False
+
     async def __init_async__(self):
-        # sometimes it takes a while to get the useragent data (such as no cache)
-        self.fake_ua = await asyncio.to_thread(UserAgent)
+        if self.local_config['use_fakeua']:
+            # sometimes it takes a while to get the useragent data (such as no cache)
+            self.fake_ua = await asyncio.to_thread(UserAgent)
+
+    def _get_ua(self):
+        if self.fake_ua is None:
+            return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
+        return self.fake_ua.edge
 
     @Cog.listener('on_message')
     async def _on_message(self, message: Message):
@@ -172,11 +182,11 @@ class Mojira(Cog):
         :raises discord.NotFound: if issue page does not exist (404)
         :raises discord.HTTPException: if requesting for the page fails (not-200)"""
 
-        if not all(i in 'MC-1234567890' for i in issue_id):  # only MC-x issues (no MCL, MCD, MCPE, etc.)
+        if not re.fullmatch(r'MC-\d+', issue_id):  # only MC-x issues (no MCL, MCD, MCPE, etc.)
             raise ValueError(f"Obiously invalid mojira issue id: {issue_id}")
 
         url = f'https://bugs.mojang.com/browse/{issue_id}'
-        headers = {'User-Agent': self.fake_ua.edge}
+        headers = {'User-Agent': self._get_ua()}
         async with self.bot.aiohttp_session.get(url, headers=headers) as resp:
             if resp.status == 404:
                 raise NotFound(resp, f"Mojira issue {issue_id} does not exist")
