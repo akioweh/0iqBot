@@ -32,7 +32,7 @@ class PkgMgr(Cog):
             qualified_name = full_extension_path(extension, self.bot.ext_module)
             if qualified_name in self.bot.extensions.keys():
                 raise ImportError(f'Extension `{extension}` (`{qualified_name}`) is already loaded.')
-            self.bot.load_extension(qualified_name)
+            await self.bot.load_extension(qualified_name)
             await ctx.reply(f'Extension `{extension}` (`{qualified_name}`) loaded.')
         except (ImportError, NameError) as e:
             await ctx.reply(e)
@@ -46,7 +46,7 @@ class PkgMgr(Cog):
             qualified_name = full_extension_path(extension, self.bot.ext_module)
             if qualified_name not in self.bot.extensions.keys():
                 raise ImportError(f'Extension `{extension}` (`{qualified_name}`) is not loaded.')
-            self.bot.unload_extension(qualified_name)
+            await self.bot.unload_extension(qualified_name)
             await ctx.reply(f'Extension `{extension}` (`{qualified_name}`) unloaded.')
         except(ImportError, NameError) as e:
             await ctx.reply(e)
@@ -60,7 +60,7 @@ class PkgMgr(Cog):
             qualified_name = full_extension_path(extension, self.bot.ext_module)
             if qualified_name not in self.bot.extensions.keys():
                 raise ImportError(f'Extension `{extension}` (`{qualified_name}`) is not loaded.')
-            self.bot.reload_extension(qualified_name)
+            await self.bot.reload_extension(qualified_name)
             await ctx.reply(f'Extension `{extension}` (`{qualified_name}`) reloaded.')
         except(ImportError, NameError) as e:
             await ctx.reply(e)
