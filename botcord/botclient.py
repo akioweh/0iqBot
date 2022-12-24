@@ -24,6 +24,7 @@ from .configs import ConfigDict, default_guild, load_configs, new_guild_config, 
 from .errors import ExtensionDisabledGuild
 from .ext.commands import Cog as _Cog
 from .functions import *
+from .help import HelpCommand
 from .types import Param, SupportsWrite, T
 from .utils.errors import protect
 from .utils.extensions import get_all_extensions_from, parent_package_path
@@ -94,6 +95,7 @@ class BotClient(commands.Bot):
                          activity=Activity(name='...Bot Initializing...', type=0),
                          status=Status('offline'),
                          command_prefix=prefix_check,
+                         help_command=HelpCommand(),
                          max_messages=self.configs['bot']['message_cache'],
                          intents=options.pop('intents', Intents.all()))
 
