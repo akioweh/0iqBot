@@ -591,17 +591,21 @@ class BotClient(commands.Bot):
             return self.guild_configs[guild]
         raise FileNotFoundError(f'No Guild configs for{guild} found.')
 
-    def ext_guild_config(self, ext: str, guild: Guild) -> dict:
+    def ext_guild_config(self, ext: str | ModuleType, guild: Guild) -> dict:
         """
-        Get the per-guide config for an extension.
+        Get the per-guild config for an extension.
 
-        :param ext: The extension name as a string
+        :param ext: The extension module or name as a string
         :param guild: The guild to get the config for
         """
         if guild.id in self.guild_configs:
             config = self.guild_configs[guild.id]
+            if isinstance(ext, ModuleType):
+                ext = parent_package_path(ext, self.ext_module_name)
+
             if ext in config['ext']:
                 return config['ext'][ext]
+
         raise FileNotFoundError(f'No Extension configs for guild {guild} found.')
 
     def create_guild_config(self, guild: Guild):
@@ -629,26 +633,6 @@ class BotClient(commands.Bot):
                 await self.remove_cog(cog)
 
         return n
-
-    # async def close(self):
-    #     """Do Not Override"""
-    #     await self.__close_connect__()
-    #
-    #     if self._closed:
-    #         log('close() called more than once', tag='Warning')
-    #         return
-    #
-    #     await self._connection.close()
-    #
-    #     if self.ws is not None and self.ws.open:
-    #         await self.ws.close(code=1000)
-    #
-    #     await self.http.close()
-    #
-    #     if self._ready is not MISSING:
-    #         self._ready.clear()
-    #
-    #     self.loop = MISSING
 
     async def __close_connect__(self):
         """Called before connection to Discord is closed.
@@ -694,63 +678,6 @@ class BotClient(commands.Bot):
 
         log('.......... Synchronous Shutdown Finished.', tag='SHDN')
 
-    # def _cancel_asyncio_tasks(self):
-    #     """Cancels **ALL** running and scheduled asyncio tasks.
-    #     Therefore, this method must not be a coroutine
-    #     as it would recursively cancel itself."""
-    #     tasks: set[Task]
-    #     # Get all still-running tasks
-    #     if not (tasks := {t for t in all_tasks(loop=self.loop) if not t.done()}):
-    #         return
-    #     # Try HARD to cancel ALL tasks ASAP
-    #     log(f'Cancelling {len(tasks)} lingering tasks...', tag='SHDN')
-    #     if self.DEBUG:
-    #         for task in tasks:
-    #             print(task)
-    #
-    #     async def safe_canceller(t: Task):
-    #         with protect():
-    #             if t.cancelled():
-    #                 return None
-    #             if t.done():
-    #                 return t.exception() or t.result()
-    #             t.cancel()
-    #             return await t
-    #
-    #     try:
-    #         self.loop.run_until_complete(  # coros wrapped in Task to stop DeprecationWarning
-    #                 wait_for(gather(*[self.loop.create_task(safe_canceller(t)) for t in tasks], return_exceptions=True),
-    #                          timeout=10)
-    #         )
-    #     except TimeoutError:
-    #         log('Timed out waiting for lingering tasks to cancel (!!!)', tag='SHDN')
-    #         pass
-    #     except CancelledError:
-    #         log('Got cancelled while waiting on the cancelled to get cancelled...', tag='WTF')
-    #
-    #     log('All lingering tasks cancelled.', tag='SHDN')
-
-    # def stop_async_loop(self, *_):
-    #     """Completely and forcibly stops the asyncio event loop.
-    #     Catastrophic if called in the middle of an active connection."""
-    #     log('Stopping asyncio event loop...', tag='SHDN')
-    #     with protect():
-    #         self.loop.run_until_complete(self.__shutdown_async__())
-    #
-    #     if self.loop.is_running():  # if the loop is still running, cancel all tasks
-    #         with protect():
-    #             self._cancel_asyncio_tasks()
-    #         with protect():
-    #             self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-    #
-    #     if self.loop.is_running():
-    #         self.loop.stop()
-    #         log('Waiting for asyncio event loop to stop...', tag='SHDN')
-    #     while self.loop.is_running():
-    #         pass
-    #
-    #     log('Asyncio event loop stopped.', tag='SHDN')
-
     def clear(self):
         """Resets all flags, clears all caches,
         and resets all states of the bot...
@@ -774,11 +701,6 @@ class BotClient(commands.Bot):
         self._closed = False
         self._ready.clear()
         self._connection.clear()
-
-    # async def start(self, token: str, *, reconnect: bool = True):
-    #     """Do Not Override"""
-    #     await self.login(token)
-    #     await self.connect(reconnect=reconnect)
 
     async def __aenter__(self):
         log('Performing Asynchonous Initialization...', tag='INIT')
