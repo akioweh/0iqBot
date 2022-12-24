@@ -2,7 +2,7 @@ from random import sample
 from typing import Final, Optional, TYPE_CHECKING
 
 from discord import Message
-from discord.ext.commands import CommandError, Context, MissingRequiredArgument, group
+from discord.ext.commands import CommandError, Context, Group, MissingRequiredArgument, group
 
 from botcord.ext.commands import Cog
 
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 
 class MineSweeper(Cog):
+    minesweeper: Group  # type annotations from the @group decorator don't quite work
     EMOJI: Final = {
         -1: '💥',
         0 : '⬛',
@@ -121,7 +122,7 @@ class MineSweeper(Cog):
                 e = error
                 # but if e has content then it must be raised from the above ctx.invoke
                 # then it is unexpected and should be passed on (not overwrite it with original error)
-            await ctx.bot.on_command_error(ctx, e, fire_anyway=True)
+            await self.bot.on_command_error(ctx, e, fire_anyway=True)
 
     @minesweeper.command()
     async def reveal(self, ctx: Context):

@@ -199,15 +199,16 @@ class BotClient(commands.Bot):
 
     @property
     def ext_module(self) -> ModuleType:
-        """reimports root extension package;
+        """**REimports** root extension package and returns it;
         runs synchronously..."""
         invalidate_caches()
         self._ext_module = import_module(self.configs['bot']['extension_dir'], getcwd())
         return self._ext_module
 
-    async def load_extensions_in(self, package: ModuleType):
+    async def load_extensions_in(self, package: ModuleType) -> int:
         """Load all valid extensions within a Python package.
-        Recursively crawls through all subdirectories"""
+        Recursively crawls through all subdirectories
+        :return: the number of extensions loaded"""
         extensions = list(get_all_extensions_from(package))
         results = await gather(*(self.load_extension(ext) for ext in extensions), return_exceptions=True)
         n = 0
@@ -221,7 +222,7 @@ class BotClient(commands.Bot):
         return n
 
     @staticmethod
-    async def blocked_check(ctx: commands.Context):
+    async def blocked_check(ctx: commands.Context) -> bool:
         if ctx.cog:
             cconf = getattr(ctx.cog, 'local_config', dict())
             cblocked = getattr(cconf, 'blocked_users', dict())
@@ -245,7 +246,7 @@ class BotClient(commands.Bot):
         return True
 
     @staticmethod
-    def _blocked_check_helper(ctx: commands.Context, blocked_entries: list, scope='a'):
+    def _blocked_check_helper(ctx: commands.Context, blocked_entries: list, scope='a') -> bool:
         if scope not in ('a', 'g', 'c'):
             raise ValueError(f'Scope parameter must be either a, g, or c, not {scope}')
 
@@ -262,7 +263,7 @@ class BotClient(commands.Bot):
         return True
 
     @staticmethod
-    async def in_prefix(bot, message):
+    async def in_prefix(bot, message) -> list[str]:
         guild_id = getattr(message.guild, 'id', None)
         if (guild_id is not None) and (guild_id in bot.guild_prefixes):
             if bot.guild_prefixes[guild_id] and message.content.startswith(bot.guild_prefixes[guild_id]):
@@ -270,7 +271,7 @@ class BotClient(commands.Bot):
         return bot.prefix
 
     @staticmethod
-    async def mentioned_or_in_prefix(bot, message):
+    async def mentioned_or_in_prefix(bot, message) -> list[str]:
         return commands.when_mentioned_or(*await BotClient.in_prefix(bot, message))(bot, message)
 
     async def logm(self, message: str, /, tag: str = 'Main', end: str = '\n', time: bool = True, *,
@@ -372,6 +373,9 @@ class BotClient(commands.Bot):
         # custom event dispatched when a Member has just completed membership verification/screening
         if before.pending and not after.pending:
             self.dispatch('verification_complete', after)
+
+    async def on_presence_update(self, before, after):
+        pass
 
     async def on_verification_complete(self, member):  # custom event from above
         pass
@@ -523,10 +527,12 @@ class BotClient(commands.Bot):
         return any(message.content.startswith(i) for i in await self.command_prefix(self, message))
 
     async def validate_guild_configs(self):
-        """"Validates" guild configs by updating any dynamic settings
+        """
+        "Validates" guild configs by updating any dynamic settings
         and ensuring proper format and required fields are present
 
-        Currently just updates the guild invite in the configs"""
+        Automatically ran upon bot startup
+        """
         guilds = self.guilds
 
         # ========== Basic Hard-Format Validation ========== #
@@ -727,7 +733,7 @@ class BotClient(commands.Bot):
         else:
             raise RuntimeError('Impossible. Unexpected __aexit__ call')
 
-        log('Performing Asynchronous Shutdown...' ,tag='SHDN')
+        log('Performing Asynchronous Shutdown...' , tag='SHDN')
 
         if not self.is_closed():
             with protect():
