@@ -34,8 +34,7 @@ class MineSweeper(Cog):
         self.bot: BotClient = bot
 
     @group(aliases=['ms'],
-           usage='<width> <height> [mines] OR\n'
-                 'iq [minesweeper|ms] <size>',
+           usage='<width> <height> [mines]  OR  <size>',
            invoke_without_command=True)
     async def minesweeper(self, ctx: Context, width: int, height: int, mines: Optional[int] = None):
         """Generates minesweeper board using spoilers.

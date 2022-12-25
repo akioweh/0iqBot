@@ -39,7 +39,8 @@ class HelpCommand(_DefaultHelpCommand):
 
         def get_category(command):
             cog = command.cog
-            return cog.qualified_name if cog is not None else 'No Category'
+            return cog.qualified_name if cog is not None else '\u200bNo Category'
+            # the \u200b is a zero-width space character to force the field to be sorted at the bottom
 
         filtered = await self.filter_commands(bot.commands, sort=True, key=get_category)
         to_iterate = itertools.groupby(filtered, key=get_category)
@@ -49,15 +50,15 @@ class HelpCommand(_DefaultHelpCommand):
             commands = sorted(commands, key=lambda c: c.name)
             embed.add_field(
                     name=category,
-                    value='\n'.join(f'{tab}`{c.name}`' +
-                                    (f'\n{tab} ↳ {c.short_doc}' if c.short_doc else '')
+                    value='\n'.join(f'\u007c{tab}`{c.name}`' +
+                                    (f'\n\u007c{tab} ↳ {c.short_doc}' if c.short_doc else '')
                                     for c in commands),
                     inline=False
             )
 
         embed.set_footer(
-                text=f'Type `{self.context.clean_prefix}{self.invoked_with} <command>` for more info on a command.\n'
-                     f'You can also type `{self.context.clean_prefix}{self.invoked_with} <category>` for more info on a category.'
+                text=f'Type{tab}{self.context.clean_prefix}{self.invoked_with} <command>{tab}for more info on a command.\n'
+                     f'You can also type{tab}{self.context.clean_prefix}{self.invoked_with} <category>{tab}for more info on a category.'
         )
 
         await self.send_embed(embed)
@@ -66,35 +67,66 @@ class HelpCommand(_DefaultHelpCommand):
         tab = '\u3164'
         embed = Embed(
                 title=f'{cog.qualified_name} Commands',
-                description=f'`{cog.description}`' if cog.description else 'No Group Description',
+                description=f'{cog.description}' if cog.description else 'No Group Description',
                 color=self.color
         )
 
         filtered = await self.filter_commands(cog.get_commands(), sort=True)
         for command in filtered:
-            embed.add_field(
-                    name=f'`{command.name}`',
-                    value=tab + (command.short_doc or 'N/A'),
-                    inline=False
-            )
+            title = f'`{command.qualified_name}`'
+            if command.usage or command.signature:
+                title += f' *`{command.usage or command.signature}`*'
+
+            desc = f'\u007c{tab}{command.short_doc}' if command.short_doc else '\u200b'
+
+            embed.add_field(name=title, value=desc, inline=False)
+
+        embed.set_footer(text='Command argument syntaxes are shown: <arg> = required, [arg=DEFAULT] = optional (with a default value)')
+
         await self.send_embed(embed)
 
     async def send_group_help(self, group: Group, /) -> None:
-        embed = Embed(title=f'`{group.name}`', color=self.color)
+        name = group.name
+        if len(group.aliases) > 0:
+            aliases = '`|`'.join(group.aliases)
+            name = f'`{group.name}`|`{aliases}`'
+        else:
+            name = f'`{group.name}`'
+
+        embed = Embed(title=name, color=self.color)
         embed.add_field(name='Description', value=group.help or 'N/A', inline=False)
         embed.add_field(
                 name='Arguments',
                 value=f'`{group.usage or group.signature or "None"}`',
                 inline=False
         )
+
+        if len(group.commands) > 0:
+            filtered = await self.filter_commands(group.commands, sort=True)
+            subcommands = ''
+            for command in filtered:
+                subcommands += f'`{command.name}` {command.short_doc if command.short_doc else ""}\n'
+
+            embed.add_field(name='Subcommands', value=subcommands, inline=False)
+
+        embed.set_footer(text='Command argument syntaxes are shown: <arg> = required, [arg=DEFAULT] = optional (with a default value)')
+
         await self.send_embed(embed)
 
     async def send_command_help(self, command: Command, /) -> None:
-        embed = Embed(title=f'`{command.name}`', color=self.color)
+        name = command.name
+        if len(command.aliases) > 0:
+            aliases = '`|`'.join(command.aliases)
+            name = f'`{command.name}`|`{aliases}`'
+        else:
+            name = f'`{command.name}`'
+
+        embed = Embed(title=name, color=self.color)
         embed.add_field(name='Description', value=command.help or 'N/A', inline=False)
         embed.add_field(
                 name='Arguments',
                 value=f'`{command.usage or command.signature or "None"}`',
                 inline=False
         )
+        embed.set_footer(text='Command argument syntaxes are shown: <arg> = required, [arg=DEFAULT] = optional (with a default value)')
         await self.send_embed(embed)
