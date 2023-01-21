@@ -1,8 +1,8 @@
-import datetime
 from typing import TYPE_CHECKING
 
 from discord import Embed, Member
 from discord.ext.commands import Cog
+from discord.utils import utcnow
 
 from botcord.functions import log
 
@@ -52,7 +52,7 @@ class Welcomer(Cog):
     async def on_verification_complete(self, member: Member):
         if not (welcome_channel := await self.get_welcome_channel(member.guild)):
             return
-        time_difference = datetime.datetime.utcnow() - member.joined_at
+        time_difference = utcnow() - member.joined_at
         await welcome_channel.send(f'It took `{member.name}` **`{time_difference}`** '
                                    f'to complete the Member Verification. <:pepesmile:867100567151181824>')
 
