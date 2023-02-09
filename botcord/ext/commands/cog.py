@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class Cog(_bruh_do_not_import_this_Cog):
     """
     Same as :class:`discord.ext.commands.Cog` but with extra file-based configuration features.
-    Allows the cog to conviniently save and access data from a config file.
+    Allows the cog to conveniently save and access data from a config file.
 
     Your custom extension class should inherit this class the same way you use the ordinary Cog.
 

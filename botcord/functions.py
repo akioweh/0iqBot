@@ -8,7 +8,7 @@ from typing import Any, AnyStr, Iterable, Optional
 
 from discord import Message
 
-from .types import FileDescripor, SupportsWrite
+from .types import FileDescriptor, SupportsWrite
 
 
 def removeprefix(string: str, prefix: str | Iterable[str]) -> str:
@@ -83,13 +83,13 @@ def clean_return(string: str) -> str:
     return str(string).replace('\r\n', '\n').replace('\r', '\n').replace(' \n', '\n').strip()
 
 
-def load_list(filepath: FileDescripor) -> list[str]:
+def load_list(filepath: FileDescriptor) -> list[str]:
     """loads a list of strings from a text file, items delimited by newlines"""
     with open(filepath, mode='r', encoding='utf-8') as file:
         return file.read().splitlines()
 
 
-def save_list(filepath: FileDescripor, array: Iterable[AnyStr]):
+def save_list(filepath: FileDescriptor, array: Iterable[AnyStr]):
     """saves a list of items as strings to a text file, delimited by newlines"""
     with open(filepath, mode='w', encoding='utf-8') as file:
         for item in array:
@@ -202,14 +202,24 @@ def contain_word(msg: Message | str, check: Iterable[str] | str, match_case: boo
     return any(_re_findall(rf'\b{i}\b', string, 0 if match_case else IGNORECASE) for i in items)
 
 
-def recursive_update(base: dict, extra: dict) -> None:
-    """Recursively updates dictionary with extra data.
+def recursive_update(base: dict, extra: dict, type_safe: bool = True) -> None:
+    """Recursively updates base dictionary with extra data.
 
-    **updates base IN PLACE**"""
+    **updates** ``base`` **IN PLACE**
+
+    :param base: base dictionary to be updated
+    :param extra: dictionary similar to base, but with extra data
+    :param type_safe: if True (default), will raise TypeError if a key in base and extra have different types.
+    None values in base are allowed to be overwritten by any type.
+    """
     for k, v in extra.items():
-        if k in base and isinstance(base[k], dict) and isinstance(extra[k], dict):
+        base_type = type(base[k])
+        new_type = type(extra[k])
+        if k in base and base_type == new_type == dict:  # if both are dicts, recurse
             recursive_update(base[k], extra[k])
-        else:
+        else:  # otherwise, just overwrite
+            if type_safe and base[k] is not None and base_type != new_type:
+                raise TypeError(f'Type mismatch while merging dicts: {base_type} != {new_type} at key "{k}"')
             base[k] = extra[k]
 
 

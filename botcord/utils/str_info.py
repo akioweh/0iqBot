@@ -92,7 +92,7 @@ def badge_names(flags: PublicUserFlags) -> str:
     etc."""
     names = ('- Discord Staff \n' if flags.staff else '') + \
             ('- Discord Partner \n' if flags.partner else '') + \
-            ('- Hypesquade Host \n' if flags.hypesquad else '') + \
+            ('- Hypesquad Host \n' if flags.hypesquad else '') + \
             ('- Bug Hunter lvl1 \n' if flags.bug_hunter else '') + \
             ('- Bug Hunter lvl2 \n' if flags.bug_hunter_level_2 else '') + \
             ('- Hypesquad House: Bravery \n' if flags.hypesquad_bravery else '') + \

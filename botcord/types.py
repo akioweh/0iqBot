@@ -3,7 +3,7 @@
 from os import PathLike
 from typing import ParamSpec, Protocol, TypeAlias, TypeVar
 
-__all__ = ['BasicValues', 'BasicTypes', 'ConfigDict', 'Param', 'T', 'StrOrPath', 'FileDescripor', 'SupportsWrite']
+__all__ = ['BasicValues', 'BasicTypes', 'ConfigDict', 'Param', 'T', 'StrOrPath', 'FileDescriptor', 'SupportsWrite']
 
 # Poggers recursive type annotations lmao
 BasicValues: TypeAlias = str | int | float | bool | None
@@ -15,7 +15,7 @@ Param: ParamSpec = ParamSpec('Param')  # need to explicitly annotate as ParamSpe
 T: 'T' = TypeVar('T')
 
 StrOrPath: TypeAlias = str | bytes | PathLike[str] | PathLike[bytes]
-FileDescripor: TypeAlias = StrOrPath | int
+FileDescriptor: TypeAlias = StrOrPath | int
 
 
 class SupportsWrite(Protocol):  # couldn't find this in any builtin definitions

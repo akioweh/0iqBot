@@ -9,7 +9,7 @@ from types import ModuleType
 
 def get_all_extensions_from(package: ModuleType) -> Generator[str, None, None]:
     """
-    Only parameter should be reference to an imoprtlib package object containing desired extensions.
+    Only parameter should be reference to an importlib package object containing desired extensions.
     Yields string namespaces of valid extensions within ``package``, to be imported separately
 
     An extension is a python module with some additional properties.

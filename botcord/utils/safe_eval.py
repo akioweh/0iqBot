@@ -45,7 +45,7 @@ class MathParser:
         :raises ValueError when allowed_operations is incorrect
         :raises ArithmeticError when expression contains disallowed operations
         :raises TypeError when expression contains non-math items
-        :raises SyntaxError when expression is syntaxtically invalid (it must be valid as a Python expression)
+        :raises SyntaxError when expression is syntactically invalid (it must be valid as a Python expression)
         """
         self.bin_ops = MathParser._BIN_OPs.copy()
         self.un_ops = MathParser._UN_OPs.copy()
