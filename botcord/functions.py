@@ -1,5 +1,5 @@
 """All kinds of highly generic simple utility functions"""
-
+import re
 from collections.abc import Generator
 from datetime import datetime
 from re import IGNORECASE, findall as _re_findall
@@ -223,5 +223,65 @@ def recursive_update(base: dict, extra: dict, type_safe: bool = True) -> None:
             base[k] = extra[k]
 
 
+def smart_time_s(seconds: int | float) -> str:
+    """Formats time in seconds into a succinct word-based string.
+
+    Formatting, if time is...:
+        - =1 -> "1 second"
+        - <60 -> "x seconds"
+        - =60 -> "1 minute"
+        - 60x -> "x minutes"
+        - 60x + 1 -> "x minutes and 1 second"
+        - 60x + y -> "x minutes and y seconds"
+
+    If time is >= 3600, will also include hours.
+    If time is >= 86400, will also include days.
+    If time is >= 31556952, will also include years.
+    If time is >= 31556952000, will also include centuries.
+
+    If time is a ``float``, will include milliseconds (even if it is a whole number).
+    """
+
+    # break down the time into its components
+    if isinstance(seconds, float):
+        seconds = round(seconds, 3)  # round to the nearest millisecond
+        ms = round(seconds * 1000 % 1000)
+        seconds = int(seconds)
+    else:
+        ms = None
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+    years, days = divmod(days, 365)
+    centuries, years = divmod(years, 100)
+
+    # build string
+    output = ''
+    if centuries:
+        output += f'{centuries} {"century" if centuries == 1 else "centuries"}, '
+    if years:
+        output += f'{years} year{"" if years == 1 else "s"}, '
+    if days:
+        output += f'{days} day{"" if days == 1 else "s"}, '
+
+    if hours:
+        output += f'{hours} hour{"" if hours == 1 else "s"} '
+    if minutes or (hours and ms is not None):
+        output += f'{minutes} minute{"" if minutes == 1 else "s"} '
+    if seconds or not output or ('minute' in output and ms is not None):
+        output += f'{seconds} second{"" if seconds == 1 else "s"} '
+    if ms is not None:
+        output += f'{ms} millisecond{"" if ms == 1 else "s"} '
+
+    # remove trailing comma and space
+    output = output.rstrip(', ').strip()
+
+    # add 'and' if long output
+    if len(re.findall(r'\d+', output)) > 3:
+        output = re.sub(r'(\d+)(\s\w+)$', r'and \1\2', output)
+
+    return output
+
+
 __all__ = ['removesuffix', 'removeprefix', 'time_str', 'log', 'to_int', 'to_flt', 'clean_return', 'load_list',
-           'save_list', 'batch', 'contain_any', 'contain_all', 'contain_word', 'recursive_update']
+           'save_list', 'batch', 'contain_any', 'contain_all', 'contain_word', 'recursive_update', 'smart_time_s']
