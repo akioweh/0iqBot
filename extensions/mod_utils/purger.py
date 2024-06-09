@@ -41,3 +41,7 @@ class Purger(Cog):
                 deleted += task
 
         await ctx.send(f'Obliration complete. ({deleted} messages vaporized)', delete_after=5)
+
+
+async def setup(bot: 'BotClient'):
+    await bot.add_cog(Purger(bot))
