@@ -1,7 +1,7 @@
 from asyncio import gather, TimeoutError
 from typing import TYPE_CHECKING
 
-from discord import User, TextChannel
+from discord import User, TextChannel, Message
 from discord.ext.commands import command, Context
 
 from botcord.ext.commands import Cog
@@ -38,14 +38,17 @@ class Purger(Cog):
         tasks = []
         for channel in channels:
             tasks.append(channel.purge(check=lambda m: m.author == user))
-        await gather(*tasks, return_exceptions=True)
+
+        res = await gather(*tasks, return_exceptions=True)
+
         deleted = 0
-        for task in tasks:
-            if isinstance(task, Exception):
+        r: Exception | list[Message]
+        for r in res:
+            if isinstance(r, Exception):
                 await ctx.send('An error occurred while purging messages.')
-                raise task
+                raise r
             else:
-                deleted += task
+                deleted += len(r)
 
         await ctx.send(f'Obliration complete. ({deleted} messages vaporized)', delete_after=5)
 
