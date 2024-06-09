@@ -1,4 +1,4 @@
-from asyncio import gather
+from asyncio import gather, TimeoutError
 from typing import TYPE_CHECKING
 
 from discord import User, TextChannel
@@ -18,11 +18,18 @@ class Purger(Cog):
     async def obliterate(self, ctx: Context, user: User):
         """Obliterate someone by deleting ALL their messages, ever."""
         await ctx.send(f'Are you sure you want to obliterate {user.mention}? (yes/no)', delete_after=5)
-        reply = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author and m.channel == ctx.channel, timeout=10)
-        if reply.content.lower() == 'yes':
-            await ctx.send(f'Obliterating {user.mention}...', delete_after=5)
-            await self._obliterate(ctx, user)
-        else:
+        try:
+            reply = await self.bot.wait_for(
+                'message',
+                check=lambda m: m.author == ctx.author and m.channel == ctx.channel,
+                timeout=10
+            )
+            if reply.content.lower() == 'yes':
+                await ctx.send(f'Obliterating {user.mention}...', delete_after=5)
+                await self._obliterate(ctx, user)
+            else:
+                await ctx.send('Obliteration cancelled.', delete_after=5)
+        except TimeoutError:
             await ctx.send('Obliteration cancelled.', delete_after=5)
 
     @staticmethod
