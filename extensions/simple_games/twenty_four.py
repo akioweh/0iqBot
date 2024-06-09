@@ -1,18 +1,20 @@
 """24 but twenty_four because python symbols can't start with a number"""
 
-import math
 from asyncio import CancelledError, Future, TimeoutError, ensure_future
 from contextlib import suppress
+from datetime import datetime
 from fractions import Fraction
 from operator import add, mul, sub, truediv
 from random import randint
-from time import time
 from typing import Final, Iterator, Optional, TYPE_CHECKING
 
+import math
 from discord import Message
 from discord.ext.commands import Context, group
+from time import time
 
 from botcord.ext.commands import Cog
+from botcord.functions import smart_time_s
 from botcord.utils import MathParser
 
 if TYPE_CHECKING:
@@ -32,6 +34,7 @@ class TwentyFour(Cog):
         self.bot = bot
         self.parser = MathParser(allowed_operations={add, mul, sub, truediv})
         self.pending_games: dict[int, Future] = {}  # ids of question messages that aren't answerded yet and their waiting listeners
+        self.wait_time: Final[int] = 300  # 5 minutes
 
     def complete_game(self, q_msg_id: int):
         """remove the "game" from self.pending_games
@@ -57,43 +60,44 @@ class TwentyFour(Cog):
         question = await self.bot.to_process(TwentyFour._new_q)  # subprocess offloading
         q_msg: Message = await ctx.reply(f'`{" ".join(str(i) for i in question)}`')
 
-        # annnnnnd, wait for an answer
-        # the wait might be cancled from elsewhere, when the question is answered some other way,
+        # and, wait for an answer
+        # the wait might be cancelled from elsewhere, when the question is answered some other way,
         # so we check for that
-        deadline: float = time() + 300  # a generous 5 minutes :)
-        # also check for timeout here, just in case, to prevent infinite loops
-        # also check for cancelation... again, just in case (im fucking losing this)
+
+        def check(m: Message):
+            if not (m.reference and m.reference.message_id == q_msg.id):
+                return False
+            if m.author != ctx.author:
+                print('sending msg')
+                self.bot.task_keeper.run_coro(m.reply('You can\'t answer other people\'s questions!', delete_after=5))
+                return False
+            return True
+
+        deadline: float = time() + self.wait_time
         while time() < deadline:
             answer_listener = self.bot.wait_for(
-                    'message', check=lambda m: m.reference and m.reference.message_id == q_msg.id,  # only replies count
+                    'message', check=check,
                     timeout=max(1., deadline - time())  # a persistent timeout across iterations
             )
             answer_listener = ensure_future(answer_listener)  # make sure we can cancel the listener
             self.pending_games[q_msg.id] = answer_listener
+
             try:
                 answer_msg: Message = await answer_listener
             except TimeoutError:  # no response
-                await q_msg.reply('No answer received within 5 minutes :(')
+                await q_msg.reply(f'No answer received within {smart_time_s(self.wait_time)} :(')
                 break
             except CancelledError:  # question has been answered some other way
                 break
-            if answer_msg.author != ctx.author:
-                await answer_msg.reply('You can\'t answer other people\'s questions!')
-            else:  # valid reply (from OP), check the answer
-                if await self.bot.does_trigger_command(answer_msg):
-                    continue  # ignore commands
 
-                correct, response = self.check_answer(answer_msg.content, question)
+            if await self.bot.does_trigger_command(answer_msg):
+                continue  # ignore commands
 
-                if correct is None:  # invalid answer
-                    await answer_msg.reply(response, delete_after=5)
-                elif not correct:  # incorrect answer
-                    await answer_msg.reply(response)
-                elif correct:  # correct answer
-                    await answer_msg.reply(response.format(str(answer_msg.created_at - q_msg.created_at)))
-                    break  # we can stop listening for answers now
+            if await self._check_and_feedback(answer_msg.content, question, answer_msg, q_msg.created_at):
+                break  # answer is correct, stop waiting
+
         else:
-            await q_msg.reply('No answer received within 5 minutes :(')
+            await q_msg.reply(f'No answer received within {smart_time_s(self.wait_time)} :(')
 
         self.complete_game(q_msg.id)
 
@@ -130,16 +134,22 @@ class TwentyFour(Cog):
             await ctx.reply('Can\'t submit an answer to a question that wasn\'t made by me', delete_after=5)
             return
 
+        if await self._check_and_feedback(answer, q_nums, ctx.message, q_msg.created_at):
+            self.complete_game(q_msg.id)  # cancel the command-less listener
+
+    async def _check_and_feedback(self, answer: str, q_nums: list[int],
+                                  answer_msg: Message, start_time: datetime) -> bool:
         correct, response = self.check_answer(answer, q_nums)
 
         if correct is None:  # invalid answer
-            await ctx.reply(response, delete_after=5)
+            await answer_msg.reply(response, delete_after=5)
+            return False
         elif not correct:  # incorrect answer
-            await ctx.reply(response)
+            await answer_msg.reply(response)
+            return False
         elif correct:  # correct answer
-            await ctx.reply(response.format(str(ctx.message.created_at - q_msg.created_at)))
-
-            self.complete_game(q_msg.id)  # cancel the command-less listener
+            await answer_msg.reply(response.format(str(answer_msg.message.created_at - start_time)))
+            return True
 
     # @Cog.listener('on_message_all')
     # async def detect_submit_soooooper(self, message: Message):
@@ -153,14 +163,16 @@ class TwentyFour(Cog):
     # ============= COMPUTATION FUNCTIONS ============= #
 
     def check_answer(self, answer: str, q_nums: list[int]) -> tuple[bool | None, str]:
-        """checks if an answer is corret and provides a feedback message,
-        returns tuple of (status, message)
+        """Checks if an answer is correct and provides a feedback message
 
-        statuses:
+        :returns: tuple of (status, message)
+
+        Statuses:
 
         True = correct (is 24);
         False = incorrect (not 24);
-        None = invalid answer (violates rules/invalid string)"""
+        None = invalid answer (violates rules/invalid string)
+        """
         answer = answer.strip('`').strip()  # allow code block formatting
 
         try:
@@ -173,12 +185,13 @@ class TwentyFour(Cog):
             return None, 'Invalid expression content.'
         except ArithmeticError:
             return None, 'Only four basic operations are allowed: + - * / \n' \
-                          '(and no leading minus because that\'s negation, not subtraction)'
+                         '(and no leading minus because that\'s negation, not subtraction)'
         else:  # expression might already equal 24, but we have more checks to do:
-            try:  # verify that the answer is valid; uses all four numbers, and only once each
+            # verify that the answer is valid; uses all four numbers, and only once each
+            try:  # we use a try-except block to easily return on failed checks
                 operators = '+-*/'
-                numers = ''.join(map(str, q_nums))
-                allowed_chars = operators + numers + '()'
+                numbers = ''.join(map(str, q_nums))
+                allowed_chars = operators + numbers + '() '  # numbers, operators, parentheses, and spaces are allowed
                 if not all(i in allowed_chars for i in answer):
                     raise ValueError
                 clean = answer.replace('(', '').replace(')', '').replace(' ', '')  # only keep numbers and operators
@@ -189,11 +202,11 @@ class TwentyFour(Cog):
                     raise ValueError
                 if not all(clean[i] in operators for i in (1, 3, 5)):  # make sure the operators are in their positions
                     raise ValueError
-                if not all(clean[i] in numers for i in (0, 2, 4, 6)):  # make sure the numbers are in their positions
+                if not all(clean[i] in numbers for i in (0, 2, 4, 6)):  # make sure the numbers are in their positions
                     raise ValueError
-                nums = [clean[0], clean[2], clean[4], clean[6]]  # the digits only as a 4-long string
-                for i in numers:  # make sure each number is used and used only once
-                    nums.remove(i)
+                nums = [clean[0], clean[2], clean[4], clean[6]]  # isolate the numbers used in the answer
+                if not set(nums) == set(numbers):  # make sure each number is used and used only once
+                    raise ValueError
 
             except ValueError:
                 return None, 'That doesn\'t seem like a valid answer'

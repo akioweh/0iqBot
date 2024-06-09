@@ -1,4 +1,4 @@
-from asyncio import (CancelledError, Future, Task, gather, get_event_loop, iscoroutinefunction, run)
+from asyncio import (CancelledError, Future, Task, all_tasks, gather, get_event_loop, iscoroutinefunction, run)
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module, invalidate_caches
@@ -20,13 +20,13 @@ from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandO
                                          NoPrivateMessage, UserInputError)
 from discord.utils import MISSING
 
-from .configs import ConfigDict, default_guild, load_configs, new_guild_config, save_config, save_guild_config
+from .configs import ConfigDict, load_configs, new_guild_config, save_config, save_guild_config
 from .errors import ExtensionDisabledGuild
 from .ext.commands import Cog as _Cog
 from .functions import *
 from .help import HelpCommand
 from .types import Param, SupportsWrite, T
-from .utils.errors import protect
+from .utils import TaskKeeper, protect
 from .utils.extensions import get_all_extensions_from, parent_package_path
 
 # Fix to stop aiohttp spamming errors in stderr when closing because that is uglier
@@ -57,6 +57,7 @@ class BotClient(commands.Bot):
     _runner: Optional[Task]
     latest_message: Optional[Message]
     aiohttp_session: Optional[ClientSession]
+    task_keeper: Optional[TaskKeeper]
     process_pool: Optional[ProcessPoolExecutor]
     configs: ConfigDict
     guild_configs: dict[int, ConfigDict]
@@ -102,6 +103,7 @@ class BotClient(commands.Bot):
         # Additional utility stuff
         self.latest_message = None
         self.aiohttp_session = None
+        self.task_keeper = None
         self.process_pool = None
         if self._process_count > 0:
             self.process_pool = ProcessPoolExecutor(max_workers=self._process_count,
@@ -129,6 +131,9 @@ class BotClient(commands.Bot):
         if self._async_init_ed:
             return False
         self._async_init_ed = True
+
+        self.task_keeper = TaskKeeper(self.loop)
+        self.task_keeper.start()
 
         # Load extensions
         log('Loading Extensions...', tag='Exts')
@@ -543,11 +548,12 @@ class BotClient(commands.Bot):
             # ensure a config exists for each guild
             if guild.id not in self.guild_configs:
                 self.guild_configs[guild.id] = self.create_guild_config(guild)
-            # ensure the config is properly formatted
-            else:
-                temp_conf = default_guild()
-                recursive_update(temp_conf, self.guild_configs[guild.id])
-                self.guild_configs[guild.id] = temp_conf  # recursive_update() updates the temp_conf in place
+            # we actually don't need this here because the loading process does this
+            # # ensure the config is properly formatted
+            # else:
+            #     temp_conf = default_guild()
+            #     recursive_update(temp_conf, self.guild_configs[guild.id], allow_new=True)
+            #     self.guild_configs[guild.id] = temp_conf  # recursive_update() updates the temp_conf in place
 
         # ========== Update Guild Invite Link ========== #
 
@@ -591,8 +597,8 @@ class BotClient(commands.Bot):
                 if ext_key not in self.guild_configs[guild.id]['ext']:
                     self.guild_configs[guild.id]['ext'][ext_key] = {'enabled': False}  # default to disabled
 
-        # saves any changes made to file
-        self.save_guild_configs()
+        # # saves any changes made to file
+        # self.save_guild_configs()
 
     def guild_config(self, guild: Guild | int) -> dict:
         """Returns the guild config for the given guild."""
@@ -664,6 +670,8 @@ class BotClient(commands.Bot):
             n = await self.unload_extensions()
             log(f'Unloaded {n} Extensions & Cogs.', tag='Exts')
 
+        if self.task_keeper:
+            self.task_keeper.stop()
         if self.aiohttp_session:
             await self.aiohttp_session.close()
 
@@ -700,6 +708,7 @@ class BotClient(commands.Bot):
         self._running = False
         self._runner = None
         self.aiohttp_session = None
+        self.task_keeper = None
 
         # the process pool and extensions have to be reinitialized because they get shut down/unloaded
         # and is only initialized in __init__, which we do not call again (obviously)
@@ -811,9 +820,17 @@ class BotClient(commands.Bot):
         if not self.thread:
             raise RuntimeError('Tried to stop threaded running not but there are no threads.')
 
-        log('Stopping Bot in Runner Thread...', tag='MAIN')
-        with protect():
-            self.loop.call_soon_threadsafe(self._runner.cancel)
+        if self._runner is None:  # probably got stuck at async init
+            log('Stopping Bot (During Init) in Runner Thread...', tag='MAIN')
+            self.loop.stop()
+            for task in all_tasks(self.loop):
+                with suppress(CancelledError):
+                    task.cancel()
+
+        else:  # normal shutdown
+            log('Stopping Bot in Runner Thread...', tag='MAIN')
+            with protect():
+                self.loop.call_soon_threadsafe(self._runner.cancel)
 
         self.thread.join()
         log('........ Bot in Runner Thread Stopped.', tag='MAIN')

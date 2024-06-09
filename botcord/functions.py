@@ -1,6 +1,6 @@
 """All kinds of highly generic simple utility functions"""
 import re
-from collections.abc import Generator
+from collections.abc import Generator, MutableMapping, Mapping
 from datetime import datetime
 from re import IGNORECASE, findall as _re_findall
 from sys import stdout as __stdout__
@@ -202,25 +202,39 @@ def contain_word(msg: Message | str, check: Iterable[str] | str, match_case: boo
     return any(_re_findall(rf'\b{i}\b', string, 0 if match_case else IGNORECASE) for i in items)
 
 
-def recursive_update(base: dict, extra: dict, type_safe: bool = True) -> None:
+def recursive_update(base: MutableMapping, extra: Mapping, type_safe: bool = True, allow_new: bool = False) -> None:
     """Recursively updates base dictionary with extra data.
 
     **updates** ``base`` **IN PLACE**
 
     :param base: base dictionary to be updated
-    :param extra: dictionary similar to base, but with extra data
-    :param type_safe: if True (default), will raise TypeError if a key in base and extra have different types.
-    None values in base are allowed to be overwritten by any type.
+    :param extra: dictionary similar to ``base``, but with extra data
+    :param type_safe: if True (default), will raise TypeError if a key in ``base`` and extra have different types.
+    None values in ``base`` are allowed to be overwritten by any type.
+    :param allow_new: if True, will allow new keys in extra to be added to ``base``. Default is False.
     """
-    for k, v in extra.items():
-        base_type = type(base[k])
-        new_type = type(extra[k])
-        if k in base and base_type == new_type == dict:  # if both are dicts, recurse
-            recursive_update(base[k], extra[k])
-        else:  # otherwise, just overwrite
-            if type_safe and base[k] is not None and base_type != new_type:
-                raise TypeError(f'Type mismatch while merging dicts: {base_type} != {new_type} at key "{k}"')
-            base[k] = extra[k]
+    if not isinstance(base, MutableMapping):
+        raise TypeError(f'base must be a MutableMapping, not {type(base).__name__}')
+    if not isinstance(extra, Mapping):
+        raise TypeError(f'extra must be a Mapping, not {type(extra).__name__}')
+
+    for k, v_e in extra.items():
+        if k in base:  # update key value
+            v_b = base[k]
+            t_b = type(v_b)
+            t_e = type(v_e)
+
+            if k in base and issubclass(t_b, Mapping) and issubclass(t_e, Mapping):  # if both are dicts, recurse
+                recursive_update(v_b, v_e, type_safe, allow_new)
+            else:  # otherwise, overwrite value
+                if type_safe and v_b is not None and not (t_b == t_e or issubclass(t_e, t_b)):  # type mismatch
+                    raise TypeError(f'Type mismatch while merging dicts: {t_b} != {t_e} at key "{k}"')
+                base[k] = v_e
+
+        else:  # create new key
+            if not allow_new:
+                raise KeyError(f'Key "{k}" not found in base dict')
+            base[k] = v_e
 
 
 def smart_time_s(seconds: int | float) -> str:

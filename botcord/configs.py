@@ -12,7 +12,7 @@ from .types import ConfigDict
 DEFAULT_GLOBAL_CONFIG_PATH: str = os.path.dirname(os.path.realpath(__file__)) + '/default_global_configs.yml'
 DEFAULT_GUILD_CONFIG_PATH: str = os.path.dirname(os.path.realpath(__file__)) + '/default_guild_configs.yml'
 
-YAML_rw: YAML = YAML()  # yaml reader-writer
+YAML_rw: YAML = YAML(pure=True)  # yaml reader-writer
 YAML_rw.indent(mapping=4, sequence=4, offset=2)
 
 # for caching purposes
@@ -33,7 +33,7 @@ def load_configs(*, global_path: str = 'global_configs.yml',
             wloaded = YAML_rw.load(wfile)
             if wloaded:
                 try:
-                    recursive_update(global_configs, wloaded)
+                    recursive_update(global_configs, wloaded, allow_new=True)
                 except TypeError:
                     log(f'Incorrect data format in global config file. Using default.', tag='Warning')
                     global_configs = default_global()  # reset to default (in case of partial overwrite)
@@ -56,7 +56,7 @@ def load_configs(*, global_path: str = 'global_configs.yml',
             if not wloaded:
                 continue
             try:
-                recursive_update(config_file, wloaded)
+                recursive_update(config_file, wloaded, allow_new=True)
             except TypeError:
                 log(f'Incorrect data format in config file: {file}. Using default.', tag='Warning')
                 config_file = default_guild()  # reset to default (in case of partial overwrite)
@@ -86,7 +86,7 @@ def new_guild_config(guild_id: int,
     recursive_update(config, {'guild': {'id': guild_id}})
     if initial_config is not None:
         try:
-            recursive_update(config, initial_config)
+            recursive_update(config, initial_config, allow_new=True)
         except TypeError:
             log(f'Incorrect data format in initial config while creating new config for guild {guild_id}. '
                 f'Using default.', tag='Warning')

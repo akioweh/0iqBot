@@ -4,7 +4,7 @@
 
 
 bot:
-    prefix:                          # prefix that works everywhere
+    prefix:                          # prefixes that work everywhere
       - '-IQ '
       - '-iq '
       - 'iq '
@@ -21,6 +21,7 @@ permissions:
 
     admin:
       - 
+
     mod:
       - 
 
