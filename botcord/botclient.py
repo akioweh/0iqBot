@@ -654,7 +654,10 @@ class BotClient(commands.Bot):
     async def __close_connect__(self):
         """Called before connection to Discord is closed.
         Do Not Directly Call"""
-        await self.change_presence(status=Status('offline'))
+        with suppress(AttributeError):
+            # This can be raised when the bot is shut down without an established websocket (discord connection)
+            # I.e. when the bot is requested to shut down without fully initializing.
+            await self.change_presence(status=Status('offline'))
 
     async def __shutdown_async__(self):
         """Called before the asyncio event loop halts.
