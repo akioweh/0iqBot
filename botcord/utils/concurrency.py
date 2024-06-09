@@ -62,10 +62,8 @@ class TaskKeeper:
             for task in self.tasks:
                 if not task.done():
                     with suppress(CancelledError):
-                        print('cancelling task', task)
                         task.cancel()
 
         with suppress(CancelledError):
-            print('cancelling awaiter')
             self._awaiter.cancel()
         self._running = False
