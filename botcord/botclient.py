@@ -823,12 +823,13 @@ class BotClient(commands.Bot):
         if not self.thread:
             raise RuntimeError('Tried to stop threaded running not but there are no threads.')
 
-        if self._runner is None:  # probably got stuck at async init
+        if self._runner is None:  # not fully initialized yet
             log('Stopping Bot (During Init) in Runner Thread...', tag='MAIN')
-            self.loop.stop()
-            for task in all_tasks(self.loop):
-                with suppress(CancelledError):
-                    task.cancel()
+            with suppress(RuntimeError):
+                self.loop.stop()
+                for task in all_tasks(self.loop):
+                    with suppress(CancelledError):
+                        task.cancel()
 
         else:  # normal shutdown
             log('Stopping Bot in Runner Thread...', tag='MAIN')
