@@ -5,6 +5,7 @@ from discord import User, TextChannel, Message
 from discord.ext.commands import command, Context
 
 from botcord.ext.commands import Cog
+from botcord.ext.commands.checks import guild_admin_or_perms
 
 if TYPE_CHECKING:
     from botcord import BotClient
@@ -14,7 +15,8 @@ class Purger(Cog):
     def __init__(self, bot: 'BotClient'):
         self.bot: 'BotClient' = bot
 
-    @command(aliases=['clear', 'cancel'])
+    @command(aliases=['clear', 'cancel'], hidden=True)
+    @guild_admin_or_perms()
     async def obliterate(self, ctx: Context, user: User):
         """Obliterate someone by deleting ALL their messages, ever."""
         await ctx.send(f'Are you sure you want to obliterate {user.mention}? (yes/no)', delete_after=5)
