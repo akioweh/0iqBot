@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Callable
 from contextlib import suppress
-from typing import Optional, Sequence, TYPE_CHECKING, Union
+from typing import Sequence, TYPE_CHECKING
 
 from discord import AllowedMentions, Forbidden, HTTPException, Member, NotFound, TextChannel, User, Webhook
 from discord.ext.commands import Cog, Context, command
@@ -39,10 +39,12 @@ class MessageHook(Cog):
 
     @command(name='resend', aliases=['repost'])
     async def _resend_cmd(self, ctx: Context, *, text: str = None):
-        await self._sendas_cmd(ctx, user=ctx.author, text=text)
+        # new discord.py typing annotations for @command are too complicated for PyCharm?!!!
+        # noinspection PyTypeChecker
+        await self._sendas_cmd(ctx, ctx.author, text=text)
 
     @command(name='sendas', aliases=['sayas'])
-    async def _sendas_cmd(self, ctx: Context, user: Union[User, Member], *, text: str = None, delete: bool = True):
+    async def _sendas_cmd(self, ctx: Context, user: User | Member, *, text: str = None, delete: bool = True):
         if text is None and ctx.message.attachments is None:
             return
         if len(text) > 2000:
@@ -81,7 +83,7 @@ class MessageHook(Cog):
 
     @staticmethod
     async def clean_hooks(chl: TextChannel, check: Callable[[Webhook], bool]) -> int:
-        hooks: Optional[list[Webhook]] = await chl.guild.webhooks()
+        hooks: list[Webhook] | None = await chl.guild.webhooks()
         delete_ables = [hook for hook in hooks if check(hook)]
         if not delete_ables:
             return 0
@@ -97,8 +99,8 @@ class MessageHook(Cog):
                    attachments: Sequence = None,
                    allowed_mentions: AllowedMentions = AllowedMentions.none()):
         """Sends a message to a channel with a webhook."""
-        hooks: Optional[list[Webhook]] = await chl.webhooks()
-        valid_hook: Optional[Webhook] = None
+        hooks: list[Webhook] | None = await chl.webhooks()
+        valid_hook: Webhook | None = None
         for hook in hooks:
             if hook.token:
                 valid_hook = hook
