@@ -1,5 +1,5 @@
-from asyncio import (CancelledError, Future, Task, all_tasks, gather, get_event_loop, iscoroutinefunction, run)
-from collections.abc import Coroutine
+from asyncio import CancelledError, Future, Task, all_tasks, gather, get_event_loop, iscoroutinefunction, run
+from collections.abc import Callable, Coroutine
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module, invalidate_caches
@@ -10,11 +10,10 @@ from sys import exc_info, platform as __platform__, stderr as __stderr__, stdout
 from threading import Thread
 from traceback import print_exception
 from types import ModuleType, TracebackType
-from typing import Callable, Final, Optional, Any
+from typing import Final, Any
 
 from aiohttp import ClientSession
-from discord import (Activity, Forbidden, Guild, HTTPException,
-                     Intents, Invite, Message, NotFound, Status, TextChannel)
+from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, NotFound, Status, TextChannel
 from discord.ext import commands
 from discord.ext.commands import GroupMixin
 from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandOnCooldown, DisabledCommand,
@@ -54,12 +53,12 @@ class BotClient(commands.Bot):
     _sync_shut: bool
     _async_shut: bool
     _running: bool
-    thread: Optional[Thread]
-    _runner: Optional[Task]
-    latest_message: Optional[Message]
-    aiohttp_session: Optional[ClientSession]
-    task_keeper: Optional[TaskKeeper]
-    process_pool: Optional[ProcessPoolExecutor]
+    thread: Thread | None
+    _runner: Task | None
+    latest_message: Message | None
+    aiohttp_session: ClientSession | None
+    task_keeper: TaskKeeper | None
+    process_pool: ProcessPoolExecutor | None
     configs: ConfigDict
     guild_configs: dict[int, ConfigDict]
     prefix: list[str]
@@ -291,7 +290,7 @@ class BotClient(commands.Bot):
         return commands.when_mentioned_or(*await BotClient.in_prefix(bot, message))(bot, message)
 
     async def logm(self, message: str, /, tag: str = 'Main', end: str = '\n', time: bool = True, *,
-                   channel: Optional[TextChannel] = None, file: SupportsWrite[str] = __stdout__):
+                   channel: TextChannel | None = None, file: SupportsWrite[str] = __stdout__):
         """Logs a message to file and discord channel.
 
         same as functions.log but copies message to discord
@@ -572,7 +571,7 @@ class BotClient(commands.Bot):
 
         for guild, invites in zip(guilds, guild_invites):
             self.guild_configs[guild.id]['guild']['name'] = guild.name
-            i0: list[Optional[Invite]] | Exception = invites
+            i0: list[Invite | None] | Exception = invites
             if isinstance(i0, Exception):
                 if isinstance(i0, Forbidden):  # bot doesn't have permission to view invites
                     self.guild_configs[guild.id]['guild']['invite'] = None
@@ -773,8 +772,9 @@ class BotClient(commands.Bot):
     def run(
             self,
             token: str,
-            *, reconnect: bool = True,
-            log_handler: Optional[Handler] = MISSING,
+            *,
+            reconnect: bool = True,
+            log_handler: Handler | None = MISSING,
             log_formatter: Formatter = MISSING,
             log_level: int = MISSING,
             root_logger: bool = False
