@@ -39,7 +39,7 @@ def time_str() -> str:
 
 
 def log(message: str, /, tag: str = 'Main', end: str = '\n', time: bool = True, *,
-        file: SupportsWrite = __stdout__):
+        file: SupportsWrite[str] = __stdout__):
     """Logs messages to file (stdout by default).
 
     Format:

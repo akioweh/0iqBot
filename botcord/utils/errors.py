@@ -29,7 +29,7 @@ class protect(AbstractContextManager[None]):
             *exceptions: Type[BaseException],
             compact: bool = False,
             name: str = '',
-            stream: SupportsWrite = sys.stderr
+            stream: SupportsWrite[str] = sys.stderr
     ):
         """initializer with options
 

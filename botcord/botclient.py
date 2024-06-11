@@ -1,4 +1,5 @@
 from asyncio import (CancelledError, Future, Task, all_tasks, gather, get_event_loop, iscoroutinefunction, run)
+from collections.abc import Coroutine
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module, invalidate_caches
@@ -9,7 +10,7 @@ from sys import exc_info, platform as __platform__, stderr as __stderr__, stdout
 from threading import Thread
 from traceback import print_exception
 from types import ModuleType, TracebackType
-from typing import Callable, Final, Optional
+from typing import Callable, Final, Optional, Any
 
 from aiohttp import ClientSession
 from discord import (Activity, Forbidden, Guild, HTTPException,
@@ -64,6 +65,10 @@ class BotClient(commands.Bot):
     prefix: list[str]
     guild_prefixes: dict[int, str]
     cogs: dict[str, commands.Cog | _Cog]
+    # need to explicitly state the type of `command_prefix`;
+    # it is just `in_prefix()` or `mentioned_or_in_prefix()`,
+    # but as it is passed around in a roundabout way, type checkers cannot infer this.
+    command_prefix: Callable[['BotClient', Message], Coroutine[Any, Any, list[str]]]
 
     def __init__(self, **options):
         log('Performing Synchronous Initialization...', tag='INIT')
@@ -85,20 +90,24 @@ class BotClient(commands.Bot):
         self.prefix = self.configs['bot']['prefix']
         self.guild_prefixes = {c['guild']['id']: c['bot']['prefix'] for c in self.guild_configs.values()}
 
-        prefix_check = self.mentioned_or_in_prefix \
-            if self.configs['bot']['reply_to_mentions'] else self.in_prefix
+        prefix_check = self.mentioned_or_in_prefix if self.configs['bot']['reply_to_mentions'] else self.in_prefix
         self._process_count = options.pop('multiprocessing', 0)
 
         # Init superclass with bot options
         self.__status = options.pop('status', None)
         self.__activity = options.pop('activity', None)
-        super().__init__(**options,
-                         activity=Activity(name='...Bot Initializing...', type=0),
-                         status=Status('offline'),
-                         command_prefix=prefix_check,
-                         help_command=HelpCommand(),
-                         max_messages=self.configs['bot']['message_cache'],
-                         intents=options.pop('intents', Intents.all()))
+        # need suppression for now because the `command_prefix=prefix_check,` line
+        # still triggers a false positive for the type checker
+        # noinspection PyTypeChecker
+        super().__init__(
+            **options,
+            activity=Activity(name='...Bot Initializing...', type=0),
+            status=Status('offline'),
+            command_prefix=prefix_check,
+            help_command=HelpCommand(),
+            max_messages=self.configs['bot']['message_cache'],
+            intents=options.pop('intents', Intents.all())
+        )
 
         # Additional utility stuff
         self.latest_message = None
@@ -282,7 +291,7 @@ class BotClient(commands.Bot):
         return commands.when_mentioned_or(*await BotClient.in_prefix(bot, message))(bot, message)
 
     async def logm(self, message: str, /, tag: str = 'Main', end: str = '\n', time: bool = True, *,
-                   channel: Optional[TextChannel] = None, file: SupportsWrite = __stdout__):
+                   channel: Optional[TextChannel] = None, file: SupportsWrite[str] = __stdout__):
         """Logs a message to file and discord channel.
 
         same as functions.log but copies message to discord
@@ -750,7 +759,7 @@ class BotClient(commands.Bot):
         else:
             raise RuntimeError('Impossible. Unexpected __aexit__ call')
 
-        log('Performing Asynchronous Shutdown...' , tag='SHDN')
+        log('Performing Asynchronous Shutdown...', tag='SHDN')
 
         if not self.is_closed():
             with protect(name='connection closing'):
