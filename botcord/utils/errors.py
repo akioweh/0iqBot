@@ -1,9 +1,13 @@
-import sys
 import traceback
-from typing import ContextManager, Type
+from contextlib import AbstractContextManager
+from typing import Type
+
+import sys
+
+from botcord.types import SupportsWrite
 
 
-class protect(ContextManager):
+class protect(AbstractContextManager[None]):
     """
     Context Manager used to suppress errors and print traceback/error message
     to stderr without propagating the errors (and halting the program).
@@ -20,31 +24,51 @@ class protect(ContextManager):
 
     """
 
-    def __init__(self, *exceptions: Type[BaseException], compact: bool = False):
+    def __init__(
+            self,
+            *exceptions: Type[BaseException],
+            compact: bool = False,
+            name: str = '',
+            stream: SupportsWrite = sys.stderr
+    ):
         """initializer with options
 
         :param exceptions: Variable number of exceptions to catch and protect from.
             If not specified, all exceptions are caught and protected
         :param compact: If true, prints shorter one-line error message without traceback
+        :param name: A name that if given will be printed before the error message.
+        :param stream: Stream to print error messages to.
+            Default is ``sys.stderr``
         """
-        self.exceptions = exceptions
-        self.compact = compact
+        self._exceptions = exceptions
+        self._compact = compact
+        self._name = name
+        self._stream = stream
 
     def __enter__(self):
         pass
 
-    def __exit__(self, exc_type: type | None, exc_val: BaseException | None,
-                 exc_tb: Type[traceback.TracebackException] | None) -> bool:
+    def __exit__(
+            self,
+            exc_type: type | None,
+            exc_val: BaseException | None,
+            exc_tb: Type[traceback.TracebackException] | None
+    ) -> bool:
         if exc_type is not None:
-            # do not protect is exceptions argument is specified and this exception is not in it
-            if self.exceptions and not issubclass(exc_type, self.exceptions):
+            # if a specific list of exceptions is provided via the exceptions argument, only catch those
+            if self._exceptions and not issubclass(exc_type, self._exceptions):
                 return False
-            # protect from this error, and print traceback/error message
-            if self.compact:
-                print(f'{exc_type.__name__}: {exc_val}', file=sys.stderr)
+            # otherwise, protect from all exceptions.
+            print(f'Exception ignored '
+                  f'{f"at [{self._name}] " if self._name else ""}'
+                  f'and resuming execution of the remaining program:',
+                  file=self._stream)
+            if self._compact:
+                print(f'{exc_type.__name__}: {exc_val} \n', file=self._stream)
             else:
-                print(f'Exception ignored and resuming execution of the remaining program:', file=sys.stderr)
-                traceback.print_exc()
+                print('', file=self._stream)  # extra space for readability
+                traceback.print_exc(file=self._stream)
+                print(f'(End of protect{f" [{self._name}] " if self._name else ""})', file=self._stream)
         return True
 
 

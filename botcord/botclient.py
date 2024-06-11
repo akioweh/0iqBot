@@ -180,7 +180,7 @@ class BotClient(commands.Bot):
         self._connect_init_ed = True
 
         # Validate guild configs
-        with protect():
+        with protect(name='guild config validation'):
             await self.validate_guild_configs()
             self.save_guild_configs()
 
@@ -641,12 +641,12 @@ class BotClient(commands.Bot):
         returns number of extensions unloaded"""
         n = len(self.extensions)
         for extension in tuple(self.extensions.keys()):
-            with protect():
+            with protect(name='extension unloading: unload_extension'):
                 await self.unload_extension(extension)
 
         n += len(self.cogs)
         for cog in tuple(self.cogs.keys()):
-            with protect():
+            with protect(name='extension unloading: remove_cog'):
                 await self.remove_cog(cog)
 
         return n
@@ -669,7 +669,7 @@ class BotClient(commands.Bot):
 
         # Unload all extensions
         log('Unloading extensions...', tag='SHDN')
-        with protect():
+        with protect(name='extension unloading'):
             n = await self.unload_extensions()
             log(f'Unloaded {n} Extensions & Cogs.', tag='Exts')
 
@@ -689,9 +689,9 @@ class BotClient(commands.Bot):
         self._sync_shut = True
 
         log('Saving Configs...', tag='SHDN')
-        with protect():
+        with protect(name='shutdown global config saving'):
             save_config(self.configs)
-        with protect():
+        with protect(name='shutdown guild configs saving'):
             self.save_guild_configs()
         log('...... Configs Saved.', tag='SHDN')
 
@@ -729,7 +729,7 @@ class BotClient(commands.Bot):
         log('Performing Asynchronous Initialization...', tag='INIT')
 
         await self._async_setup_hook()
-        with protect():
+        with protect(name='async init'):
             await self.__init_async__()
 
         return self
@@ -753,12 +753,12 @@ class BotClient(commands.Bot):
         log('Performing Asynchronous Shutdown...' , tag='SHDN')
 
         if not self.is_closed():
-            with protect():
+            with protect(name='connection closing'):
                 await self.__close_connect__()
             await super(GroupMixin, self).close()
             log('Discord Connection Closed.', tag='Conn')
 
-        with protect():
+        with protect(name='async shutdown'):
             await self.__shutdown_async__()
 
     def run(
@@ -782,6 +782,7 @@ class BotClient(commands.Bot):
         -> Stops asyncio event loop
 
         Blocks for as long as the bot is running & not fully shut-down.
+        Stop using KeyboardInterrupt.
         """
         if self._running:
             raise RuntimeError('Bot is already running.')
@@ -793,19 +794,20 @@ class BotClient(commands.Bot):
                 self._runner = get_event_loop().create_task(self.start(token, reconnect=reconnect))
                 await self._runner  # main "blocking" entry point
 
-        with protect():
+        with protect(name='runner wrapper'):
             with suppress(KeyboardInterrupt, SystemExit, CancelledError):
                 run(_runner())
         log('Asynchronous Runner Exited.', tag='Runr')
 
         log('Performing Synchronous Shutdown...', tag='SHDN')
-        self.__shutdown_sync__()
+        with protect(name='sync shutdown'):
+            self.__shutdown_sync__()
 
     def run_threaded(self, token: str, *, reconnect: bool = True):
         """Starts and runs the bot,
         in a separate thread.
 
-        Non-blocking. Stop bot with stop()"""
+        Non-blocking. Stop bot with stop_threaded()"""
         if self.thread:
             raise RuntimeError('Bot is already running in a thread.')
         if self._running:
@@ -817,7 +819,7 @@ class BotClient(commands.Bot):
 
     def stop_threaded(self):
         """Complete closure and shutdown of the bot,
-        by signalling for run() to stop gracefully.
+        by signaling for run() to stop gracefully.
 
         Can be manually called to stop run_threaded()"""
         if not self.thread:
@@ -825,7 +827,7 @@ class BotClient(commands.Bot):
 
         if self._runner is None:  # not fully initialized yet
             log('Stopping Bot (During Init) in Runner Thread...', tag='MAIN')
-            with suppress(RuntimeError):
+            with protect(name='stop threaded force loop.stop() call'):
                 self.loop.stop()
                 for task in all_tasks(self.loop):
                     with suppress(CancelledError):
@@ -833,7 +835,7 @@ class BotClient(commands.Bot):
 
         else:  # normal shutdown
             log('Stopping Bot in Runner Thread...', tag='MAIN')
-            with protect():
+            with protect(name='stop threaded runner.cancel() call'):
                 self.loop.call_soon_threadsafe(self._runner.cancel)
 
         self.thread.join()
