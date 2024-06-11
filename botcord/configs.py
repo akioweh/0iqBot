@@ -2,7 +2,6 @@
 
 import os
 from copy import deepcopy
-from typing import Optional
 
 from ruamel.yaml import YAML
 
@@ -75,7 +74,7 @@ def load_configs(*, global_path: str = 'global_configs.yml',
 
 
 def new_guild_config(guild_id: int,
-                     initial_config: Optional[ConfigDict] = None, *,
+                     initial_config: ConfigDict | None = None, *,
                      guild_dir: str = 'configs/') -> ConfigDict:
     """Creates a new guild config file with optional initial data
     and saves to file.

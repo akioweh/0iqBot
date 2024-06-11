@@ -1,6 +1,6 @@
-import itertools
 from typing import Mapping, TYPE_CHECKING
 
+import itertools
 from discord import Embed, Forbidden
 from discord.ext.commands import (Bot, Cog, Command, DefaultHelpCommand as _DefaultHelpCommand,
                                   Group)
@@ -86,8 +86,7 @@ class HelpCommand(_DefaultHelpCommand):
         await self.send_embed(embed)
 
     async def send_group_help(self, group: Group, /) -> None:
-        name = group.name
-        if len(group.aliases) > 0:
+        if group.aliases:
             aliases = '`|`'.join(group.aliases)
             name = f'`{group.name}`|`{aliases}`'
         else:
@@ -114,8 +113,7 @@ class HelpCommand(_DefaultHelpCommand):
         await self.send_embed(embed)
 
     async def send_command_help(self, command: Command, /) -> None:
-        name = command.name
-        if len(command.aliases) > 0:
+        if command.aliases:
             aliases = '`|`'.join(command.aliases)
             name = f'`{command.name}`|`{aliases}`'
         else:

@@ -55,7 +55,7 @@ class MathParser:
                 if i not in self.bin_ops.values() and i not in self.un_ops.values():
                     raise ValueError(f'Trying to set {i!r} as an allowed operation, but it is not a valid operation')
 
-            def disallowed_op(op_type: ast.operator | ast.unaryop) -> Callable[[...], NoReturn]:
+            def disallowed_op(op_type: ast.operator | ast.unaryop) -> Callable[..., NoReturn]:
                 def func(*_):
                     raise ArithmeticError(f'Operation {op_type.__name__} is not allowed')
                 return func
