@@ -1,22 +1,23 @@
 from typing import TYPE_CHECKING
 from urllib.parse import quote_plus as parse_url
 
-from discord.ext.commands import Cog, command
+from discord.ext.commands import command
+
+from botcord.ext.commands import Cog
 
 if TYPE_CHECKING:
     from botcord import BotClient
 
 
 class SearchLinks(Cog):
-    def __init__(self, bot):
-        self.bot: 'BotClient' = bot
+    def __init__(self, bot: 'BotClient'):
+        self.bot = bot
 
     @command(aliases=['g', 'search', 'bruhwhycouldntyoujustgooglethis'])
     async def google(self, ctx, *, query):
         if not query:
             return
-        # noinspection HttpUrlsUsage
-        await ctx.send(f'http://www.usethefuckinggoogle.com/?q={parse_url(query)}')
+        await ctx.send(f'https://letmegooglethat.com/?q={parse_url(query)}')
 
     @command(aliases=['minecraftwiki'])
     async def mcwiki(self, ctx, *, query):
