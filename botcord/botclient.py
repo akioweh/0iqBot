@@ -63,8 +63,8 @@ class BotClient(commands.Bot):
     aiohttp_session: ClientSession | None
     task_keeper: TaskKeeper | None
     process_pool: ProcessPoolExecutor | None
-    configs: ConfigDict  # type: Any # todo: more type gymnastics
-    guild_configs: dict[int, ConfigDict]  # type: Any
+    configs: ConfigDict
+    guild_configs: dict[int, ConfigDict]
     prefix: list[str]
     guild_prefixes: dict[int, str]
     cogs: dict[str, commands.Cog | _Cog]
