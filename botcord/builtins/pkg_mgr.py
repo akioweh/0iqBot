@@ -73,7 +73,10 @@ class PkgMgr(Cog):
 
         for ext_str, ext_module in self.bot.extensions.items():
             if ctx.guild is not None:
-                ext_name = parent_package_path(ext_module, self.bot.ext_module_name)
+                try:
+                    ext_name = parent_package_path(ext_module, self.bot.ext_module_name)
+                except ValueError:
+                    continue
                 try:  # try to get the extension's enabled status for the current guild
                     enabled = self.bot.guild_config(ctx.guild)['ext'][ext_name]['enabled']
                     status = '✅' if enabled else '❌'
