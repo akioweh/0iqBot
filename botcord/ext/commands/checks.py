@@ -3,6 +3,7 @@ Additional check functions to restrict command execution
 
 same format/usage as builtin :package:`discord.ext.commands` checks
 """
+from warnings import warn
 
 from discord import Member
 from discord.ext.commands import Context, MissingPermissions, check as _to_check_func, has_permissions as _has_perms
@@ -11,6 +12,8 @@ __all__ = ['guild_owner_or_perms', 'guild_admin_or_perms', 'has_global_perms', '
 
 
 def guild_owner_or_perms(**perms: bool):
+    if not perms:
+        warn('perms is empty, so this check will always pass!!!', stacklevel=2)
     has_perms = _has_perms(**perms).predicate
 
     async def check_func(ctx: Context):
@@ -22,6 +25,8 @@ def guild_owner_or_perms(**perms: bool):
 
 
 def guild_admin_or_perms(**perms: bool):
+    if not perms:
+        warn('perms is empty, so this check will always pass!!!', stacklevel=2)
     has_perms = _has_perms(**perms).predicate
 
     async def check_func(ctx: Context):
