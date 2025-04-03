@@ -13,7 +13,7 @@ from types import ModuleType, TracebackType
 from typing import Any, Final, Optional, Sequence
 
 from aiohttp import ClientSession
-from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, NotFound, Status
+from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Member, Message, NotFound, Status
 from discord.abc import Messageable, Snowflake
 from discord.ext import commands
 from discord.ext.commands import GroupMixin
@@ -331,10 +331,14 @@ class BotClient(commands.Bot):
     async def on_message_edit(self, _, after):
         self.dispatch('message_all', after)  # Custom event to trigger both on new messages and edits
 
-    async def on_member_update(self, before, after):
+    async def on_member_update(self, before: Member, after: Member):
         # custom event dispatched when a Member has just completed membership verification/screening
         if before.pending and not after.pending:
             self.dispatch('verification_complete', after)
+
+    async def on_member_join(self, member: Member):
+        if not member.pending:  # for consistency when a server has no member screening enabled
+            self.dispatch('verification_complete', member)
 
     async def on_error(self, event_method: str, /, *args, **kwargs):
         """Called when an event handler raises an exception.
