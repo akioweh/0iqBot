@@ -24,11 +24,11 @@ def walk_extensions(package: ModuleType) -> Iterator[str]:
      - it is inside a package (a subpackage within the top package)
     """
 
-    for module in walk_packages(package.__path__):
+    for module in walk_packages(package.__path__, prefix=f'{package.__name__}.'):
         if module.name.rpartition('.')[-1].startswith('_'):
             continue  # ignore private modules
 
-        imported = import_module(module.name, package.__name__)
+        imported = import_module(module.name)
         if not isfunction(getattr(imported, 'setup', None)):
             continue  # ignore modules without a setup function
 
@@ -102,8 +102,8 @@ def parent_package_path(obj: ModuleType | str | type, root_package: ModuleType |
             raise TypeError(f'Expected a ModuleType or a valid string for argument root_package, '
                             f'but got {type(root_package)}')
         root_path += '.'
-        if not parent_path.startswith(root_path):
-            raise ValueError(f'Expected {parent_path} to start with {root_path}, but it does not.')
+        # if not parent_path.startswith(root_path):
+        #     raise ValueError(f'Expected {parent_path} to start with {root_path}, but it does not.')
 
         parent_path = parent_path.removeprefix(root_path)
 

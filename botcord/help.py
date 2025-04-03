@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class HelpCommand(_DefaultHelpCommand):
-    context: Context[BotClient]
+    context: Context['BotClient']
 
     def __init__(self, **options):
         super().__init__(**options)
