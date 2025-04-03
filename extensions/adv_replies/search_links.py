@@ -17,7 +17,7 @@ class SearchLinks(Cog):
     async def google(self, ctx, *, query):
         if not query:
             return
-        await ctx.send(f'https://letmegooglethat.com/?q={parse_url(query)}')
+        await ctx.send(f'[google.com: {query}](https://letmegooglethat.com/?q={parse_url(query)})')
 
     @command(aliases=['minecraftwiki'])
     async def mcwiki(self, ctx, *, query):
