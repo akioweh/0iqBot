@@ -35,7 +35,7 @@ class KeepRoles(Cog):
             role_ids = self.local_config['keep_roles']['logs'][member.id][member.guild.id]
         except KeyError:
             return
-        roles = [member.guild.get_role(i) for i in role_ids if member.guild.get_role(i)]
+        roles = filter(None, map(member.guild.get_role, role_ids))
 
         try:
             await member.add_roles(*roles, reason='KeepRoles re-granting roles upon join', atomic=True)
