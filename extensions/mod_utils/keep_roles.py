@@ -42,6 +42,11 @@ class KeepRoles(Cog):
         except Forbidden:
             pass
 
+        del self.local_config['keep_roles']['logs'][member.id][member.guild.id]
+        if not self.local_config['keep_roles']['logs'][member.id]:
+            del self.local_config['keep_roles']['logs'][member.id]
+        self.save_local_config()
+
 
 async def setup(bot: 'BotClient'):
     await bot.add_cog(KeepRoles(bot))
