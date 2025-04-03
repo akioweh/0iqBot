@@ -5,6 +5,7 @@ from typing import Sequence, TYPE_CHECKING
 
 from discord import AllowedMentions, Forbidden, HTTPException, Member, NotFound, TextChannel, User, Webhook
 from discord.ext.commands import Cog, Context, command
+from discord.utils import MISSING
 
 if TYPE_CHECKING:
     from botcord import BotClient
@@ -112,7 +113,7 @@ class MessageHook(Cog):
         await valid_hook.send(content=content,
                               username=username,
                               avatar_url=avatar_url,
-                              files=attachments,
+                              files=attachments or MISSING,
                               allowed_mentions=allowed_mentions)
 
 
