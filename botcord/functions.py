@@ -1,36 +1,19 @@
-"""All kinds of highly generic simple utility functions"""
+"""
+All kinds of highly generic simple utility functions
+"""
+
 import re
-from collections.abc import Generator, MutableMapping, Mapping
+from collections.abc import Generator, Mapping, MutableMapping
 from datetime import datetime
-from re import IGNORECASE, findall as _re_findall
 from sys import stdout as __stdout__
-from typing import Any, AnyStr, Iterable, Optional
+from typing import Any, Iterable, Optional
 
 from discord import Message
 
 from .types import FileDescriptor, SupportsWrite
 
-
-def removeprefix(string: str, prefix: str | Iterable[str]) -> str:
-    """Similar to ``str.removeprefix()`` in python 3.9,
-    except it works for lower versions and can take a list of prefixes"""
-    if isinstance(prefix, str):
-        return string[(string.startswith(prefix) and len(prefix)):]
-    elif isinstance(prefix, Iterable):
-        for i in prefix:
-            string = removeprefix(string, i)
-        return string
-
-
-def removesuffix(string: str, suffix: str | Iterable[str]) -> str:
-    """Similar to ``str.removesuffix()`` in python 3.9,
-    except it works for lower versions and can take a list of suffixes"""
-    if isinstance(suffix, str):
-        return string[:-len(suffix)] if string.endswith(suffix) else string
-    elif isinstance(suffix, Iterable):
-        for i in suffix:
-            string = removesuffix(string, i)
-        return string
+__all__ = ['time_str', 'log', 'to_int', 'to_flt', 'clean_return', 'load_list',
+           'save_list', 'batch', 'contain_any', 'contain_all', 'contain_word', 'recursive_update', 'smart_time_s']
 
 
 def time_str() -> str:
@@ -89,7 +72,7 @@ def load_list(filepath: FileDescriptor) -> list[str]:
         return file.read().splitlines()
 
 
-def save_list(filepath: FileDescriptor, array: Iterable[AnyStr]):
+def save_list(filepath: FileDescriptor, array: Iterable[str]):
     """saves a list of items as strings to a text file, delimited by newlines"""
     with open(filepath, mode='w', encoding='utf-8') as file:
         for item in array:
@@ -115,7 +98,7 @@ def batch(msg: str, d: str = '\n', length: int = 2000, *, d2: str = ' ') -> Gene
     if splitted[-1] == d:
         splitted.pop()
     else:
-        splitted[-1] = removesuffix(splitted[-1], d)
+        splitted[-1] = splitted[-1].removesuffix(d)
 
     cache = ''
     while splitted:
@@ -136,8 +119,9 @@ def batch(msg: str, d: str = '\n', length: int = 2000, *, d2: str = ' ') -> Gene
         yield cache
 
 
-def _contain_arg_helper(arg: Message | str, check: Iterable[str] | str, match_case: bool = False) -> [str,
-                                                                                                      Iterable[str]]:
+def _contain_arg_helper(
+        arg: Message | str, check: Iterable[str] | str, match_case: bool = False
+) -> tuple[str, Iterable[str]]:
     items: Iterable[str] = [check] if isinstance(check, str) else check
     if isinstance(arg, Message):
         string = arg.content
@@ -199,7 +183,7 @@ def contain_word(msg: Message | str, check: Iterable[str] | str, match_case: boo
     :rtype: bool
     """
     string, items = _contain_arg_helper(msg, check, match_case)
-    return any(_re_findall(rf'\b{i}\b', string, 0 if match_case else IGNORECASE) for i in items)
+    return any(re.findall(rf'\b{i}\b', string, 0 if match_case else re.IGNORECASE) for i in items)
 
 
 def recursive_update(base: MutableMapping, extra: Mapping, type_safe: bool = True, allow_new: bool = False) -> None:
@@ -295,7 +279,3 @@ def smart_time_s(seconds: int | float) -> str:
         output = re.sub(r'(\d+)(\s\w+)$', r'and \1\2', output)
 
     return output
-
-
-__all__ = ['removesuffix', 'removeprefix', 'time_str', 'log', 'to_int', 'to_flt', 'clean_return', 'load_list',
-           'save_list', 'batch', 'contain_any', 'contain_all', 'contain_word', 'recursive_update', 'smart_time_s']

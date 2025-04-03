@@ -1,5 +1,5 @@
 from asyncio import CancelledError, Future, Task, all_tasks, gather, get_event_loop, iscoroutinefunction, run
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Container, Coroutine
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import suppress
 from importlib import import_module, invalidate_caches
@@ -10,10 +10,11 @@ from sys import exc_info, platform as __platform__, stderr as __stderr__, stdout
 from threading import Thread
 from traceback import print_exception
 from types import ModuleType, TracebackType
-from typing import Final, Any
+from typing import Any, Final, Optional, Sequence
 
 from aiohttp import ClientSession
-from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, NotFound, Status, TextChannel
+from discord import Activity, Forbidden, Guild, HTTPException, Intents, Invite, Message, NotFound, Status
+from discord.abc import Messageable, Snowflake
 from discord.ext import commands
 from discord.ext.commands import GroupMixin
 from discord.ext.commands.errors import (CheckFailure, CommandNotFound, CommandOnCooldown, DisabledCommand,
@@ -22,12 +23,14 @@ from discord.utils import MISSING
 
 from .configs import ConfigDict, load_configs, new_guild_config, save_config, save_guild_config
 from .errors import ExtensionDisabledGuild
-from .ext.commands import Cog as _Cog
+from .ext.commands import Cog, Cog as _Cog
 from .functions import *
 from .help import HelpCommand
-from .types import Param, SupportsWrite, T
+from .types import SupportsWrite
 from .utils import TaskKeeper, protect
-from .utils.extensions import get_all_extensions_from, parent_package_path
+from .utils.extensions import parent_package_path, walk_extensions
+
+__all__ = ['BotClient']
 
 # Fix to stop aiohttp spamming errors in stderr when closing because that is uglier
 if __platform__.startswith('win'):
@@ -46,8 +49,9 @@ def _subprocess_initializer():
         signal(SIGBREAK, SIG_IGN)
 
 
+# noinspection PyTypeChecker
 class BotClient(commands.Bot):
-    DEBUG: bool
+    DEBUG: Final[bool]
     _async_init_ed: bool
     _connect_init_ed: bool
     _sync_shut: bool
@@ -59,21 +63,18 @@ class BotClient(commands.Bot):
     aiohttp_session: ClientSession | None
     task_keeper: TaskKeeper | None
     process_pool: ProcessPoolExecutor | None
-    configs: ConfigDict
-    guild_configs: dict[int, ConfigDict]
+    configs: ConfigDict  # type: Any # todo: more type gymnastics
+    guild_configs: dict[int, ConfigDict]  # type: Any
     prefix: list[str]
     guild_prefixes: dict[int, str]
     cogs: dict[str, commands.Cog | _Cog]
-    # need to explicitly state the type of `command_prefix`;
-    # it is just `in_prefix()` or `mentioned_or_in_prefix()`,
-    # but as it is passed around in a roundabout way, type checkers cannot infer this.
-    command_prefix: Callable[['BotClient', Message], Coroutine[Any, Any, list[str]]]
+    command_prefix: Callable[['BotClient', Message], Coroutine[Any, Any, list[str]]]  # type: ignore
 
-    def __init__(self, **options):
+    def __init__(self, **options) -> None:
         log('Performing Synchronous Initialization...', tag='INIT')
 
         # Flags
-        self.DEBUG: Final = getenv('DEBUG', 'false').lower() == 'true'
+        self.DEBUG = getenv('DEBUG', 'false').lower() == 'true'
         self._async_init_ed = False
         self._connect_init_ed = False
         self._sync_shut = False
@@ -125,7 +126,7 @@ class BotClient(commands.Bot):
         if self.DEBUG:
             # noinspection PyProtectedMember
             from .utils._debug import on_command_error as debug_on_command_error
-            self.on_command_error = debug_on_command_error
+            self.on_command_error = debug_on_command_error  # type: ignore
 
         log('.......... Synchronous Initialization Finished', tag='INIT')
 
@@ -198,7 +199,7 @@ class BotClient(commands.Bot):
         log('Post-Connection Initialization Finished.', tag='Conn')
         return True
 
-    def to_process(self, func: Callable[Param, T], *args) -> Future[T]:
+    def to_process[*Ts, T](self, func: Callable[[*Ts], T], *args: *Ts) -> Future[T]:
         """
         Converts a blocking/cpu-bound subroutine into an
         awaitable coroutine by running it in a process pool
@@ -224,7 +225,7 @@ class BotClient(commands.Bot):
         """Load all valid extensions within a Python package.
         Recursively crawls through all subdirectories
         :return: the number of extensions loaded"""
-        extensions = list(get_all_extensions_from(package))
+        extensions = list(walk_extensions(package))
         results = await gather(*(self.load_extension(ext) for ext in extensions), return_exceptions=True)
         n = 0
         for result, ext in zip(results, extensions):
@@ -238,6 +239,7 @@ class BotClient(commands.Bot):
 
     @staticmethod
     async def blocked_check(ctx: commands.Context) -> bool:
+        bot: 'BotClient' = ctx.bot
         if ctx.cog:
             cconf = getattr(ctx.cog, 'local_config', dict())
             cblocked = getattr(cconf, 'blocked_users', dict())
@@ -245,14 +247,12 @@ class BotClient(commands.Bot):
                 return BotClient._blocked_check_helper(ctx, cblocked, scope='c')
 
         if ctx.guild:
-            bot: 'BotClient' = ctx.bot
             gconf = bot.guild_config(ctx.guild)
             gblocked = getattr(gconf, 'blocked_users', dict())
             if ctx.author.id in gblocked:
                 return BotClient._blocked_check_helper(ctx, gblocked, scope='g')
 
         if 1:
-            bot: 'BotClient' = ctx.bot
             conf = bot.configs
             blocked = getattr(conf, 'blocked_users', dict())
             if ctx.author.id in blocked:
@@ -261,17 +261,17 @@ class BotClient(commands.Bot):
         return True
 
     @staticmethod
-    def _blocked_check_helper(ctx: commands.Context, blocked_entries: list, scope='a') -> bool:
+    def _blocked_check_helper(ctx: commands.Context, blocked_entries: Container[str], scope='a') -> bool:
         if scope not in ('a', 'g', 'c'):
             raise ValueError(f'Scope parameter must be either a, g, or c, not {scope}')
 
-        if ctx.command.name in blocked_entries:
+        if ctx.command is not None and ctx.command.name in blocked_entries:
             return False
         if any(i in blocked_entries for i in ctx.invoked_parents):
             return False
         if 'ALL' in blocked_entries:
             return False
-        if scope in ('a', 'g') and ctx.cog.qualified_name in blocked_entries:
+        if scope in ('a', 'g') and ctx.cog is not None and ctx.cog.qualified_name in blocked_entries:
             return False
         if scope == 'a' and ctx.guild in blocked_entries:
             return False
@@ -290,7 +290,7 @@ class BotClient(commands.Bot):
         return commands.when_mentioned_or(*await BotClient.in_prefix(bot, message))(bot, message)
 
     async def logm(self, message: str, /, tag: str = 'Main', end: str = '\n', time: bool = True, *,
-                   channel: TextChannel | None = None, file: SupportsWrite[str] = __stdout__):
+                   channel: Messageable | None = None, file: SupportsWrite[str] = __stdout__):
         """Logs a message to file and discord channel.
 
         same as functions.log but copies message to discord
@@ -303,9 +303,10 @@ class BotClient(commands.Bot):
         :param file: The file to log to. If None, logs to stdout.
         """
         log(message, tag, end, time, file=file)
-        if channel is None and self.latest_message is None:
-            return
-        channel = channel or self.latest_message.channel
+        if channel is None:
+            if self.latest_message is None:
+                return
+            channel = self.latest_message.channel
         with suppress(Forbidden, NotFound):
             await channel.send(message)
 
@@ -322,147 +323,27 @@ class BotClient(commands.Bot):
     async def on_resume(self):
         log(f"Discord Connection Resumed. <{self.user}>", tag="Conn")
 
-    async def on_typing(self, channel, user, when):
-        pass
-
     async def on_message(self, message):
         self.latest_message = message
         self.dispatch('message_all', message)  # Custom event to trigger both on new messages and edits
         await super().on_message(message)
 
-    async def on_message_delete(self, message):
-        pass
-
     async def on_message_edit(self, _, after):
         self.dispatch('message_all', after)  # Custom event to trigger both on new messages and edits
-
-    async def on_reaction_add(self, reaction, user):
-        pass
-
-    async def on_reaction_remove(self, reaction, user):
-        pass
-
-    async def on_reaction_clear(self, message, reactions):
-        pass
-
-    async def on_reaction_clear_emoji(self, reaction):
-        pass
-
-    async def on_private_channel_create(self, channel):
-        pass
-
-    async def on_private_channel_delete(self, channel):
-        pass
-
-    async def on_private_channel_update(self, before, after):
-        pass
-
-    async def on_private_channel_pins_update(self, channel, last_pin):
-        pass
-
-    async def on_guild_channel_create(self, channel):
-        pass
-
-    async def on_guild_channel_delete(self, channel):
-        pass
-
-    async def on_guild_channel_update(self, before, after):
-        pass
-
-    async def on_guild_channel_pins_update(self, channel, last_ping):
-        pass
-
-    async def on_guild_integrations_update(self, guild):
-        pass
-
-    async def on_webhooks_update(self, channel):
-        pass
-
-    async def on_member_join(self, member):
-        pass
-
-    async def on_member_remove(self, member):
-        pass
 
     async def on_member_update(self, before, after):
         # custom event dispatched when a Member has just completed membership verification/screening
         if before.pending and not after.pending:
             self.dispatch('verification_complete', after)
 
-    async def on_presence_update(self, before, after):
-        pass
-
-    async def on_verification_complete(self, member):  # custom event from above
-        pass
-
-    async def on_user_update(self, before, after):
-        pass
-
-    async def on_guild_join(self, guild):
-        pass
-
-    async def on_guild_remove(self, guild):
-        pass
-
-    async def on_guild_update(self, before, after):
-        pass
-
-    async def on_guild_role_create(self, role):
-        pass
-
-    async def on_guild_role_delete(self, role):
-        pass
-
-    async def on_guild_role_update(self, before, after):
-        pass
-
-    async def on_guild_emojis_update(self, guild, before, after):
-        pass
-
-    async def on_guild_available(self, guild):
-        pass
-
-    async def on_guild_unavailable(self, guild):
-        pass
-
-    async def on_voice_state_update(self, member, before, after):
-        pass
-
-    async def on_member_ban(self, guild, user):
-        pass
-
-    async def on_member_unban(self, guild, user):
-        pass
-
-    async def on_invite_create(self, invite):
-        pass
-
-    async def on_invite_delete(self, invite):
-        pass
-
-    async def on_group_join(self, channel, user):
-        pass
-
-    async def on_group_remove(self, channel, user):
-        pass
-
-    async def on_relationship_add(self, relationship):
-        pass
-
-    async def on_relationship_remove(self, relationship):
-        pass
-
-    async def on_relationship_update(self, before, after):
-        pass
-
-    async def on_error(self, event_name: str, *args, **kwargs):
+    async def on_error(self, event_method: str, /, *args, **kwargs):
         """Called when an event handler raises an exception.
 
         This method returns True if the exception was handled
         and None/False otherwise.
         (useful for cooperation between subclass methods)
 
-        :param event_name: The name of the event that raised the exception (prefixed with "on_").
+        :param event_method: The name of the event that raised the exception (prefixed with "on_").
         :param args: The positional arguments (if any) that were passed to the event.
         :param kwargs: The keyword arguments (if any) that were passed to the event.
         """
@@ -471,11 +352,8 @@ class BotClient(commands.Bot):
         if exc_type == ExtensionDisabledGuild:  # Can be raised outside a command, e.g. from an event listener
             return True
 
-        print(f'Ignoring exception in event {event_name}:', file=__stderr__)
+        print(f'Ignoring exception in event {event_method}:', file=__stderr__)
         print_exception(exc_type, exception, traceback)
-
-    async def on_command(self, context: commands.Context):
-        pass
 
     # noinspection DuplicatedCode
     # the "duplicated code" is from the debug version of this function which has extra logging
@@ -530,9 +408,6 @@ class BotClient(commands.Bot):
         print(f'Ignoring exception in command {context.command}:', file=__stderr__)
         print_exception(type(exception), exception, exception.__traceback__, file=__stderr__)
 
-    async def on_command_completion(self, context):
-        pass
-
     async def load_commands(self):
         pass
 
@@ -541,7 +416,18 @@ class BotClient(commands.Bot):
         that *could* trigger a command on the bot"""
         return any(message.content.startswith(i) for i in await self.command_prefix(self, message))
 
-    async def validate_guild_configs(self):
+    async def add_cog(
+            self,
+            cog: Cog,  # type: ignore
+            /,
+            *,
+            override: bool = False,
+            guild: Optional[Snowflake] = MISSING,
+            guilds: Sequence[Snowflake] = MISSING,
+    ) -> None:
+        await super().add_cog(cog, override=override, guild=guild, guilds=guilds)
+
+    async def validate_guild_configs(self) -> None:
         """
         "Validates" guild configs by updating any dynamic settings
         and ensuring proper format and required fields are present
@@ -567,12 +453,12 @@ class BotClient(commands.Bot):
 
         # concurrently gather invites for speedups with multiple guilds
         tasks = [guild.invites() for guild in guilds]
-        guild_invites = await gather(*tasks, return_exceptions=True)
+        guild_invites: list[list[Invite] | BaseException] = await gather(*tasks, return_exceptions=True)
 
         for guild, invites in zip(guilds, guild_invites):
             self.guild_configs[guild.id]['guild']['name'] = guild.name
-            i0: list[Invite | None] | Exception = invites
-            if isinstance(i0, Exception):
+            i0 = invites
+            if isinstance(i0, BaseException):
                 if isinstance(i0, Forbidden):  # bot doesn't have permission to view invites
                     self.guild_configs[guild.id]['guild']['invite'] = None
                 else:  # something went horribly wrong
@@ -729,6 +615,7 @@ class BotClient(commands.Bot):
                                                     initializer=_subprocess_initializer)
         self.load_extensions_in(self._ext_module)
 
+        # noinspection PyAttributeOutsideInit
         self._closed = False
         self._ready.clear()
         self._connection.clear()
@@ -845,11 +732,8 @@ class BotClient(commands.Bot):
         else:  # normal shutdown
             log('Stopping Bot in Runner Thread...', tag='MAIN')
             with protect(name='stop threaded runner.cancel() call'):
-                self.loop.call_soon_threadsafe(self._runner.cancel)
+                self.loop.call_soon_threadsafe(self._runner.cancel, ())  # empty args because type checker dumb
 
         self.thread.join()
         log('........ Bot in Runner Thread Stopped.', tag='MAIN')
         self.thread = None
-
-
-__all__ = ['BotClient']

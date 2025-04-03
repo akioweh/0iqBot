@@ -1,8 +1,8 @@
 __title__ = 'BotCord'
-__author__ = 'KEN_2000'
+__author__ = 'Akioweh'
 __version__ = '1.0.0'
 
-from . import configs, errors
+from . import configs, errors, functions
 from .botclient import BotClient
 from .functions import *
 from .utils import find, str_info

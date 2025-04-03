@@ -1,11 +1,14 @@
-"""Helpers to safely evaluate different expressions as strings.
+"""
+Helpers to safely evaluate different expressions as strings.
 
-Currently only contains a MathParser"""
+Currently only contains a MathParser
+"""
 
 import ast
 import operator as op
-from numbers import Number
 from typing import Callable, Final, NoReturn
+
+type Num = int | float
 
 
 class MathParser:
@@ -13,30 +16,31 @@ class MathParser:
     Expressions must follow Python code syntax -
     i.e. 2**3 and not 2^3; 2*3 and not 2(3)"""
 
-    _BIN_OPs: Final[dict[ast.operator, Callable[[Number, Number], Number]]] = {
-        ast.Add     : op.add,
-        ast.Sub     : op.sub,
-        ast.Mult    : op.mul,
-        ast.Div     : op.truediv,
-        ast.FloorDiv: op.floordiv,
-        ast.Mod     : op.mod,
-        ast.Pow     : op.pow,
-        ast.LShift  : op.lshift,
-        ast.RShift  : op.rshift,
-        ast.BitOr   : op.or_,
-        ast.BitXor  : op.xor,
-        ast.BitAnd  : op.and_,
-        ast.MatMult : op.matmul
+    # todo: this seems really dumb... also, the typing issue is not my problem; typeshed bad
+    _BIN_OPs: Final[dict[ast.operator, Callable[[Num, Num], Num]]] = {
+        ast.Add: op.add,  # type: ignore
+        ast.Sub: op.sub,  # type: ignore
+        ast.Mult: op.mul,  # type: ignore
+        ast.Div: op.truediv,  # type: ignore
+        ast.FloorDiv: op.floordiv,  # type: ignore
+        ast.Mod: op.mod,  # type: ignore
+        ast.Pow: op.pow,  # type: ignore
+        ast.LShift: op.lshift,  # type: ignore
+        ast.RShift: op.rshift,  # type: ignore
+        ast.BitOr: op.or_,  # type: ignore
+        ast.BitXor: op.xor,  # type: ignore
+        ast.BitAnd: op.and_,  # type: ignore
+        ast.MatMult: op.matmul  # type: ignore
     }
 
-    _UN_OPs: Final[dict[ast.unaryop, Callable[[Number], Number]]] = {
-        ast.Not   : op.not_,
-        ast.Invert: op.inv,
-        ast.USub  : op.neg,
-        ast.UAdd  : op.pos
+    _UN_OPs: Final[dict[ast.unaryop, Callable[[Num], Num]]] = {
+        ast.Not: op.not_,  # type: ignore
+        ast.Invert: op.inv,  # type: ignore
+        ast.USub: op.neg,  # type: ignore
+        ast.UAdd: op.pos  # type: ignore
     }
 
-    def __init__(self, allowed_operations: set = None):
+    def __init__(self, allowed_operations: set | None = None):
         """
         :param allowed_operations: set of functions from the builtin operator module
         that are allowed in an expression.
@@ -58,43 +62,39 @@ class MathParser:
             def disallowed_op(op_type: ast.operator | ast.unaryop) -> Callable[..., NoReturn]:
                 def func(*_):
                     raise ArithmeticError(f'Operation {op_type.__name__} is not allowed')
+
                 return func
 
             for k, v in self.bin_ops.items():
                 if v not in allowed_operations:
                     self.bin_ops[k] = disallowed_op(k)
-            for k, v in self.un_ops.items():
-                if v not in allowed_operations:
-                    self.un_ops[k] = disallowed_op(k)
+            for k_, v_ in self.un_ops.items():
+                if v_ not in allowed_operations:
+                    self.un_ops[k_] = disallowed_op(k_)
 
-    def eval(self, node: ast.Expression | ast.expr) -> ast.expr | int | float:
+    def eval(self, node: ast.Expression | ast.expr) -> Num:
         if isinstance(node, ast.Expression):
             return self.eval(node.body)
 
         elif isinstance(node, ast.expr):
             if isinstance(node, ast.BinOp):
-                # noinspection PyTypeChecker
-                return self.bin_ops[type(node.op)](self.eval(node.left), self.eval(node.right))
+                return self.bin_ops[node.op](self.eval(node.left), self.eval(node.right))
 
             elif isinstance(node, ast.UnaryOp):
-                # noinspection PyTypeChecker
-                return self.un_ops[type(node.op)](self.eval(node.operand))
+                return self.un_ops[node.op](self.eval(node.operand))
 
             elif isinstance(node, ast.Constant):
-                if not isinstance(val := node.value, Number):
+                if not isinstance(val := node.value, (int, float)):
                     raise TypeError(f'Non-Number constant literal found: {val!r} of type {type(val)}')
                 return val
 
             else:
-                # noinspection PyTypeChecker
                 raise TypeError(f'Non-math-y expression {ast.dump(node)} of type {type(node)}')
 
         else:
             raise TypeError(f'WTF, this should not have happened. Expression.body should always return ast.expr'
                             f'but got {type(node)}')
 
-    def parse(self, expr: str) -> int | float:
-        # ast.parse() in eval mode always returns ast.Expression object; the stub type is inaccurate
-        # noinspection PyTypeChecker
+    def parse(self, expr: str) -> Num:
         ast_data: ast.Expression = ast.parse(expr, mode='eval')
         return self.eval(ast_data)

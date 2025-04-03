@@ -1,13 +1,15 @@
+import sys
 import traceback
 from contextlib import AbstractContextManager
+from types import TracebackType
 from typing import Type
-
-import sys
 
 from botcord.types import SupportsWrite
 
+__all__ = ['protect']
 
-class protect(AbstractContextManager[None]):
+
+class protect(AbstractContextManager[None, bool]):
     """
     Context Manager used to suppress errors and print traceback/error message
     to stderr without propagating the errors (and halting the program).
@@ -52,7 +54,7 @@ class protect(AbstractContextManager[None]):
             self,
             exc_type: type | None,
             exc_val: BaseException | None,
-            exc_tb: Type[traceback.TracebackException] | None
+            exc_tb: TracebackType | None
     ) -> bool:
         if exc_type is not None:
             # if a specific list of exceptions is provided via the exceptions argument, only catch those
@@ -70,6 +72,3 @@ class protect(AbstractContextManager[None]):
                 traceback.print_exc(file=self._stream)
                 print(f'(End of protect{f" [{self._name}] " if self._name else ""})', file=self._stream)
         return True
-
-
-__all__ = ['protect']

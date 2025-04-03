@@ -1,15 +1,18 @@
-"""Utility functions for managing bot extensions"""
+"""
+Utility functions for managing bot extensions
+"""
 
-from collections.abc import Generator
+from collections.abc import Iterator
 from importlib import import_module
 from inspect import isfunction
 from pkgutil import walk_packages
 from types import ModuleType
 
+__all__ = ['walk_extensions', 'resolve_extension_path', 'parent_package_path']
 
-def get_all_extensions_from(package: ModuleType) -> Generator[str, None, None]:
+
+def walk_extensions(package: ModuleType) -> Iterator[str]:
     """
-    Only parameter should be reference to an importlib package object containing desired extensions.
     Yields string namespaces of valid extensions within ``package``, to be imported separately
 
     An extension is a python module with some additional properties.
@@ -21,21 +24,18 @@ def get_all_extensions_from(package: ModuleType) -> Generator[str, None, None]:
      - it is inside a package (a subpackage within the top package)
     """
 
-    def on_error(name):
-        raise ImportError(name=name)
+    for module in walk_packages(package.__path__):
+        if module.name.rpartition('.')[-1].startswith('_'):
+            continue  # ignore private modules
 
-    for module in walk_packages(package.__path__, package.__name__ + '.', onerror=on_error):
-        if module.name.rpartition('.')[-1].startswith("_"):
-            continue
-
-        imported = import_module(module.name)
+        imported = import_module(module.name, package.__name__)
         if not isfunction(getattr(imported, 'setup', None)):
-            continue
+            continue  # ignore modules without a setup function
 
         yield module.name
 
 
-def full_extension_path(module_name: str, in_package: ModuleType) -> str:
+def resolve_extension_path(module_name: str, in_package: ModuleType) -> str:
     """Returns the full path of a module relative to in_package, from a shortened name,
     such as that of just the module, without the parent packages.
 
@@ -46,7 +46,11 @@ def full_extension_path(module_name: str, in_package: ModuleType) -> str:
 
     raises ImportError if the name cannot be found or errors occur during imports"""
 
-    matches: list[str] = [module for module in get_all_extensions_from(in_package) if module.endswith(module_name)]
+    matches = [
+        module
+        for module in walk_extensions(in_package)
+        if module.endswith(module_name)
+    ]
 
     if not matches:
         raise ImportError(f'No module named {module_name} found in {in_package.__name__}')
@@ -58,45 +62,49 @@ def full_extension_path(module_name: str, in_package: ModuleType) -> str:
     return matches[0]
 
 
-def parent_package_path(module: ModuleType | str | object, root_package: ModuleType | str = None) -> str:
-    """Returns the path of the package containing the given module
+def parent_package_path(obj: ModuleType | str | type, root_package: ModuleType | str | None = None) -> str:
+    """Determines the containing package of the given object,
+    which should be a module, user-defined class, or a string representative of a module path.
 
-    Assumes that the argument is the path to a module if it is in string form
+    Note that string paths are not validated
+    and are assumed to not be a package themselves.
 
-    If root_package is given, the path will be relative to that package
+    If given, ``root_package`` is removed as a prefix from the path.
+    (And the path is checked to ensure it is a descendant of ``root_package``.)
 
-    Does not check if the module is actually a module or if the
-    alleged parent package actually exists"""
-    parent_path = None
+    The result may be an empty string if the object is a top-level module
+    or its parent is the root package itself.
+    """
 
-    # ModuleType object with a convenient __package__ attribute
-    if getattr(module, '__package__', None) is not None:
-        parent_path = module.__package__
+    if isinstance(obj, ModuleType):
+        if obj.__spec__ is None:
+            raise ValueError(f'Module object {obj}, {obj.__name__} does not have its __spec__ set; '
+                             f'was it imported weirdly or is it the __main__ module?')
+        if (parent_path := obj.__spec__.parent) is None:
+            raise ValueError(f'Module object {obj}, {obj.__name__} does not have a parent; '
+                             f'was it created dynamically?')
+    else:
+        if isinstance(obj, str):
+            module_path = obj
+        elif isinstance(obj, type):
+            module_path = obj.__module__  # todo: don't think this is right as __module__ is just the file name?
+        else:
+            raise TypeError(f'Expected a ModuleType, str, or type for argument obj, '
+                            f'but got {type(obj)}')
+        parent_path = module_path.rpartition('.')[0]
 
-    # Object that should have a __module__ attribute that we then parse as string
-    elif getattr(module, '__module__', None) is not None:
-        parent_path = module.__module__.rpartition('.')[0]
-
-    # String that we parse as a module path
-    elif isinstance(module, str):
-        parent_path = module.rpartition('.')[0]
-
-    if parent_path is None:
-        raise TypeError(f'Expected a ModuleType, an object with __module__ attribute, or a valid string, '
-                        f'but got {type(module)}')
-
-    if root_package is not None:  # trimming the path before root_package, so it becomes "relative"
-        if isinstance(root_package, ModuleType):
-            root_path = module.__name__.rpartition('.')[2]
-        elif isinstance(root_package, str):
+    if root_package is not None:
+        if isinstance(root_package, str):
             root_path = root_package
+        elif isinstance(root_package, ModuleType):
+            root_path = root_package.__name__
         else:
             raise TypeError(f'Expected a ModuleType or a valid string for argument root_package, '
                             f'but got {type(root_package)}')
+        root_path += '.'
+        if not parent_path.startswith(root_path):
+            raise ValueError(f'Expected {parent_path} to start with {root_path}, but it does not.')
 
-        return parent_path.partition(root_path)[2].lstrip('.')
-    else:
-        return parent_path
+        parent_path = parent_path.removeprefix(root_path)
 
-
-__all__ = ['get_all_extensions_from', 'full_extension_path', 'parent_package_path']
+    return parent_path

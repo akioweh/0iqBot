@@ -1,16 +1,13 @@
-"""Functions to generated formatted strings
-containing information about Discord objects"""
+"""
+Functions to generate formatted strings
+containing information about Discord objects
+"""
 
-from discord import (Activity,
-                     ActivityType,
-                     BaseActivity,
-                     CustomActivity,
-                     Game,
-                     Member,
-                     PublicUserFlags,
-                     Role,
-                     Spotify,
-                     Streaming)
+from discord import Activity, ActivityType, CustomActivity, Game, Member, PublicUserFlags, Role, Spotify, Streaming
+
+__all__ = ['member_details', 'activity_details', 'badge_names', 'role_names']
+
+type ActivityTypes = Activity | Game | CustomActivity | Streaming | Spotify  # copied from non-public code in discord.py
 
 
 def member_details(m: Member) -> str:
@@ -45,11 +42,11 @@ def member_details(m: Member) -> str:
            f"**Account Created:** `{m.created_at.strftime('%d/%m/%Y, %H:%M:%S') if hasattr(m, 'created_at') else 'N/A'}` \n" \
            f"**DM Channel:** `{getattr(m, 'dm_channel', 'N/A')}` \n" \
            f"**User ID:** `{getattr(m, 'id', 'N/A')}` \n" \
-           f"**Animated Avatar:** `{m.avatar.is_animated()}` \n" \
+           f"**Animated Avatar:** `{m.avatar and m.avatar.is_animated()}` \n" \
            f"**Public Badges:** \n```\n{badge_names(m.public_flags) if hasattr(m, 'public_flags') else 'N/A'}\n``` \n"
 
 
-def activity_details(*activities: BaseActivity) -> str:
+def activity_details(*activities: ActivityTypes) -> str:
     """Generates a highly sentient string describing the activities...
     figure the details out yourself :P"""
     act_str = ''
@@ -158,6 +155,3 @@ def _generic_activity_details(activity: Activity) -> str:
             act_str += f'at {activity.url} '
 
     return act_str.strip()
-
-
-__all__ = ['member_details', 'activity_details', 'badge_names', 'role_names']

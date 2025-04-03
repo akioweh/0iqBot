@@ -1,4 +1,6 @@
-"""Functional interface to manage bot configs"""
+"""
+Functional interface to manage bot configs
+"""
 
 import os
 from copy import deepcopy
@@ -20,7 +22,7 @@ _default_guild: ConfigDict | None = None
 
 
 def load_configs(*, global_path: str = 'global_configs.yml',
-                 guild_dir: str = 'configs/') -> [ConfigDict, dict[int, ConfigDict]]:
+                 guild_dir: str = 'configs/') -> tuple[ConfigDict, dict[int, ConfigDict]]:
     """Loads global config AND guild configs from file.
 
     :return: configs in the format of: tuple(global_config, {guild_id: guild_config})"""
@@ -60,11 +62,11 @@ def load_configs(*, global_path: str = 'global_configs.yml',
                 log(f'Incorrect data format in config file: {file}. Using default.', tag='Warning')
                 config_file = default_guild()  # reset to default (in case of partial overwrite)
 
-        guild_id = to_int(config_file['guild']['id'])
+        guild_id = to_int(config_file['guild']['id'])  # type: ignore
         if guild_id is None:
             log(f'Guild id not set in config file: {file}. Automatically setting from file name.', tag='Warning')
             log(file_name[0])
-            config_file['guild']['id'] = int(file_name[0])
+            config_file['guild']['id'] = int(file_name[0])  # type: ignore
         elif int(file_name[0]) != guild_id:
             raise AttributeError(f'Mismatched file name ID and Guild ID in file: {file}')
 
@@ -137,4 +139,3 @@ def default_guild() -> ConfigDict:
             raise FileNotFoundError('Could not find default Guild Configuration File.') from e
 
     return deepcopy(_default_guild)
-# End
