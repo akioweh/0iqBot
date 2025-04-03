@@ -19,7 +19,7 @@ ext:
         enabled: true
     welcomer:
         enabled: true
-        welcome_channel: 8394578993601577098
+        welcome_channel: 839457899360157709
     anti_spam:
         enabled: true
     counting:
